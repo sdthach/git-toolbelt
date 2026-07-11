@@ -4,6 +4,9 @@
   `getch` (fetch), `gull` (pull), `gulp` (fetch + pull), `gush` (push-current),
   `gadd`, `gommit`, `gmend` (commit --amend), `gtatus`, `giff`, `glog`, `granch`,
   `gtash`, `gout` (workon), `gome` (checkout main-branch)
+- Restructured docs: `README.md` is now a slim hub (layout tree, prerequisites/install
+  blurb, collapsible command index); full detail moved to `docs/install.md`,
+  `docs/commands.md`, `docs/portmanteaus.md`, and `docs/maintaining-the-fork.md`
 
 # v1.12.0
 
