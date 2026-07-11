@@ -7,6 +7,9 @@
 - Restructured docs: `README.md` is now a slim hub (layout tree, prerequisites/install
   blurb, collapsible command index); full detail moved to `docs/install.md`,
   `docs/commands.md`, `docs/portmanteaus.md`, and `docs/maintaining-the-fork.md`
+- Homebrew packaging: `packaging/git-toolbelt.rb` formula installs both the `git-*`
+  commands and the `portmanteaus/` shortcuts. Ships `--HEAD`-only for now; a pinned
+  stable release + the `sdthach/homebrew-tap` repo are a pending follow-up
 
 # v1.12.0
 

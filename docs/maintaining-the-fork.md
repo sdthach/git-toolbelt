@@ -40,14 +40,33 @@ $ git push origin main
 
 Because the upstream `git-*` scripts are never modified in this fork, these merges should stay fast-forward or conflict-free in the common case. Conflicts would only arise if a fork-only file (docs, portmanteaus, packaging) happens to collide with an upstream rename/move — unlikely given the additive-only approach.
 
-## Releasing / tap ops
+## Homebrew tap
 
-Release mechanics largely follow the existing [`PUBLISHING.md`](../PUBLISHING.md) flow (tag, push tag, cut a GitHub release, compute the tarball's `sha256`), adjusted for the fork's own tap:
+The formula source of truth is [`packaging/git-toolbelt.rb`](../packaging/git-toolbelt.rb) in this repo; the tap repo (`github.com/sdthach/homebrew-tap`) holds a synced copy that `brew` actually reads.
+
+### Install modes
+
+The formula supports two install paths (see [`docs/install.md`](install.md)):
+
+- **`--HEAD`** — installs from the tip of `main`. Available as soon as the tap repo exists.
+- **Stable** — installs a pinned `vX.Y.Z` tarball. Requires the formula's `url`/`sha256` to be filled, which happens the first time a release is cut.
+
+Today the formula ships **`--HEAD`-only**: its stable `url`/`sha256` stanza is commented out until the first fork release.
+
+### One-time tap bootstrap — ⏳ pending (follow-up session)
+
+Not done yet (deferred to a machine with `brew`/`ruby` so the install can actually be tested end-to-end):
+
+1. `gh repo create sdthach/homebrew-tap --public -d "Homebrew tap for my git-toolbelt fork"`.
+2. Copy `packaging/git-toolbelt.rb` into the tap repo; commit and push.
+3. Verify: `brew tap sdthach/tap && brew install --HEAD sdthach/tap/git-toolbelt`, then confirm both a `git-*` command (e.g. `git sha`) and a portmanteau (e.g. `getch`, `gush`) resolve.
+
+### Cutting a release (per version)
+
+Once the tap exists, releases follow the [`PUBLISHING.md`](../PUBLISHING.md) flow, automated by `.github/workflows/release.yml` (slice 05):
 
 1. Update `CHANGELOG.md`.
-2. Tag the version (`git tag vX.Y.Z`) and push it (`git push origin --tags`).
-3. Cut a release from the tag at `github.com/sdthach/git-toolbelt/releases`.
-4. Compute the tarball hash: `wget -O - https://github.com/sdthach/git-toolbelt/archive/vX.Y.Z.tar.gz | sha256sum`.
-5. In the `homebrew-tap` repo, update `git-toolbelt.rb`'s `url` and `sha256`, commit, and push.
+2. Tag the version (`git tag vX.Y.Z`) and push it (`git push origin vX.Y.Z`).
+3. The release workflow creates the GitHub release, computes the tarball `sha256`, and commits the updated `url`+`sha256` into `sdthach/homebrew-tap`'s `git-toolbelt.rb` (this cross-repo push needs a `TAP_TOKEN` secret — see slice 05).
 
-Slice 04 defines the formula itself (`packaging/git-toolbelt.rb`) and slice 05 automates lint/CI and the upstream sync above — this page will grow with more detail once those land.
+To do it by hand instead: cut the release at `github.com/sdthach/git-toolbelt/releases`, run `wget -O - https://github.com/sdthach/git-toolbelt/archive/refs/tags/vX.Y.Z.tar.gz | sha256sum`, and update the tap formula's `url`/`sha256`.
