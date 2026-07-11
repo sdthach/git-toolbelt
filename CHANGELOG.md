@@ -1,3 +1,10 @@
+# Unreleased (fork)
+
+- New `portmanteaus/` set of `g`+verb shortcut commands for the everyday workflow:
+  `getch` (fetch), `gull` (pull), `gulp` (fetch + pull), `gush` (push-current),
+  `gadd`, `gommit`, `gmend` (commit --amend), `gtatus`, `giff`, `glog`, `granch`,
+  `gtash`, `gout` (workon), `gome` (checkout main-branch)
+
 # v1.12.0
 
 - `git-push-current` now honors and supports a differently-named upstream
