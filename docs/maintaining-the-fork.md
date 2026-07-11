@@ -27,9 +27,21 @@ homebrew-tap/                 # separate repo: github.com/sdthach/homebrew-tap
 - `origin` → the fork (`github.com/sdthach/git-toolbelt`) — read/write, this is where feature branches and PRs land.
 - `upstream` → `github.com/nvie/git-toolbelt`, **fetch-only** — pulls in upstream fixes and features, push disabled so there's no risk of accidentally pushing to the original author's repo.
 
+## CI/CD (GitHub Actions)
+
+Three workflows live in `.github/workflows/`:
+
+- **`lint.yml`** — on every push/PR. Runs `shellcheck` on `portmanteaus/*` at full severity (the fork's own scripts) and on the upstream `git-*` scripts at `--severity=error` only (they carry pre-existing style/info/warning findings that we deliberately don't "fix", to keep upstream merges clean).
+- **`upstream-sync.yml`** — weekly cron + manual `workflow_dispatch`. Pushes `upstream/main`'s tip to an `upstream-sync/<date>` branch and opens a PR into `main` (never an auto-merge — conflicts with fork-only files surface in the PR for review).
+- **`release.yml`** — on a pushed `v*` tag. Creates the GitHub release, hashes the source tarball, and commits the new `url`+`sha256` into the tap formula.
+
+### Manual secret: `TAP_TOKEN`
+
+`release.yml` pushes to a *different* repo (`sdthach/homebrew-tap`), which the default `GITHUB_TOKEN` can't do. One-time setup: create a **fine-grained PAT** with **contents: write** scoped to `sdthach/homebrew-tap`, and add it to this repo as a secret named `TAP_TOKEN` (`gh secret set TAP_TOKEN`). Until that exists (and the tap repo is bootstrapped), `release.yml`'s tap-update step will fail — expected, since releases are a pending follow-up.
+
 ## Syncing from upstream
 
-Pull upstream changes into the fork's `main` periodically (manually today; slice 05 adds a scheduled workflow for this):
+The `upstream-sync` workflow automates this weekly, but you can also do it by hand:
 
 ```console
 $ git fetch upstream

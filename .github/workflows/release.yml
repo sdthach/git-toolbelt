@@ -1,0 +1,69 @@
+name: release
+
+# On a pushed v* tag: create the GitHub release, hash the source tarball, and
+# push the updated url+sha256 into the sdthach/homebrew-tap formula.
+#
+# Requires a repo secret TAP_TOKEN: a fine-grained PAT with contents:write on
+# sdthach/homebrew-tap. The default GITHUB_TOKEN cannot push to another repo.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
+
+      - name: Compute tarball sha256
+        id: tarball
+        run: |
+          set -euo pipefail
+          url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz"
+          sha="$(curl -fsSL "$url" | sha256sum | cut -d' ' -f1)"
+          {
+            echo "url=$url"
+            echo "sha=$sha"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Update homebrew-tap formula
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          URL: ${{ steps.tarball.outputs.url }}
+          SHA: ${{ steps.tarball.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git clone --quiet \
+            "https://x-access-token:${TAP_TOKEN}@github.com/sdthach/homebrew-tap.git" tap
+          python3 - "tap/git-toolbelt.rb" <<'PY'
+          import os, re, sys
+          path = sys.argv[1]
+          url, sha = os.environ["URL"], os.environ["SHA"]
+          lines = open(path).read().splitlines()
+          out, saw_url, saw_sha = [], False, False
+          for line in lines:
+              if re.match(r'\s*#?\s*url "https://github.com/sdthach/git-toolbelt/archive', line):
+                  out.append(f'  url "{url}"'); saw_url = True
+              elif re.match(r'\s*#?\s*sha256 "', line):
+                  out.append(f'  sha256 "{sha}"'); saw_sha = True
+              else:
+                  out.append(line)
+          if not (saw_url and saw_sha):
+              sys.exit("tap formula has no url/sha256 stanza to update")
+          open(path, "w").write("\n".join(out) + "\n")
+          PY
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "git-toolbelt $GITHUB_REF_NAME"
+          git push

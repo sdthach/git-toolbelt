@@ -10,6 +10,8 @@
 - Homebrew packaging: `packaging/git-toolbelt.rb` formula installs both the `git-*`
   commands and the `portmanteaus/` shortcuts. Ships `--HEAD`-only for now; a pinned
   stable release + the `sdthach/homebrew-tap` repo are a pending follow-up
+- CI/CD: GitHub Actions workflows for `lint` (shellcheck), `upstream-sync` (weekly PR
+  from `nvie/git-toolbelt`), and `release` (tag → GitHub release → tap formula bump)
 
 # v1.12.0
 
