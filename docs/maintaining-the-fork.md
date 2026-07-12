@@ -81,10 +81,4 @@ The tap's `main` is protected against force-push/deletion (but not behind a PR g
 
 ### Cutting a release (per version)
 
-Once the tap exists, releases follow the [`PUBLISHING.md`](../PUBLISHING.md) flow, automated by `.github/workflows/release.yml` (slice 05):
-
-1. Update `CHANGELOG.md`.
-2. Tag the version (`git tag vX.Y.Z`) and push it (`git push origin vX.Y.Z`).
-3. The release workflow creates the GitHub release, computes the tarball `sha256`, and commits the updated `url`+`sha256` into `sdthach/homebrew-tap`'s `git-toolbelt.rb` (this cross-repo push needs a `TAP_TOKEN` secret — see slice 05).
-
-To do it by hand instead: cut the release at `github.com/sdthach/git-toolbelt/releases`, run `wget -O - https://github.com/sdthach/git-toolbelt/archive/refs/tags/vX.Y.Z.tar.gz | sha256sum`, and update the tap formula's `url`/`sha256`.
+See **[`PUBLISHING.md`](../PUBLISHING.md)** for the full step-by-step runbook — version numbering (`vX.Y.Z-fork.N`), the CHANGELOG/tag steps, what `release.yml` automates, and the by-hand tap bump used while `TAP_TOKEN` is unset. In short: update `CHANGELOG.md`, push a `v*` tag (the workflow makes the GitHub release and — if `TAP_TOKEN` is set — bumps the tap formula), then verify with `brew`.
