@@ -12,6 +12,9 @@
   stable release + the `sdthach/homebrew-tap` repo are a pending follow-up
 - CI/CD: GitHub Actions workflows for `lint` (shellcheck), `upstream-sync` (weekly PR
   from `nvie/git-toolbelt`), and `release` (tag → GitHub release → tap formula bump)
+- Fix: [`git-modified`](https://github.com/sdthach/git-toolbelt/commit/a10fd2c47e6e365073dc21ab0caf4ac69465ca65)
+  no longer depends on `rev`, so it works on Git for Windows / Git Bash (which ships no
+  `rev`). The last-field extraction now uses portable `awk` (fixes [nvie#29](https://github.com/nvie/git-toolbelt/issues/29))
 
 # v1.12.0
 
