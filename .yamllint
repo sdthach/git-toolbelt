@@ -1,0 +1,10 @@
+# yamllint config tuned for GitHub Actions workflows + this repo's YAML.
+extends: default
+
+rules:
+  document-start: disable        # workflows / FUNDING.yml don't use `---`
+  line-length:
+    max: 120
+    allow-non-breakable-words: true
+  truthy:
+    check-keys: false            # don't flag the GitHub Actions `on:` key

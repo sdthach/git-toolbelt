@@ -1,3 +1,18 @@
+# Unreleased (fork)
+
+- New `portmanteaus/` set of `g`+verb shortcut commands for the everyday workflow:
+  `getch` (fetch), `gull` (pull), `gulp` (fetch + pull), `gush` (push-current),
+  `gadd`, `gommit`, `gmend` (commit --amend), `gtatus`, `giff`, `glog`, `granch`,
+  `gtash`, `gout` (workon), `gome` (checkout main-branch)
+- Restructured docs: `README.md` is now a slim hub (layout tree, prerequisites/install
+  blurb, collapsible command index); full detail moved to `docs/install.md`,
+  `docs/commands.md`, `docs/portmanteaus.md`, and `docs/maintaining-the-fork.md`
+- Homebrew packaging: `packaging/git-toolbelt.rb` formula installs both the `git-*`
+  commands and the `portmanteaus/` shortcuts. Ships `--HEAD`-only for now; a pinned
+  stable release + the `sdthach/homebrew-tap` repo are a pending follow-up
+- CI/CD: GitHub Actions workflows for `lint` (shellcheck), `upstream-sync` (weekly PR
+  from `nvie/git-toolbelt`), and `release` (tag → GitHub release → tap formula bump)
+
 # v1.12.0
 
 - `git-push-current` now honors and supports a differently-named upstream

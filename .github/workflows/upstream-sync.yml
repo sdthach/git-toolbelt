@@ -1,0 +1,54 @@
+name: upstream-sync
+
+# Pull fixes/features from upstream nvie/git-toolbelt into this fork's main by
+# opening a PR (never an auto fast-forward — fork-only files like docs/ and the
+# README hub diverge from upstream and a merge may need a human to resolve).
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Open a sync PR from upstream/main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git remote add upstream https://github.com/nvie/git-toolbelt.git
+          git fetch --quiet upstream main
+
+          ahead="$(git rev-list --count origin/main..upstream/main)"
+          if [ "$ahead" -eq 0 ]; then
+            echo "main is already up to date with upstream; nothing to sync."
+            exit 0
+          fi
+          echo "upstream is $ahead commit(s) ahead of main."
+
+          branch="upstream-sync/$(date -u +%Y%m%d)"
+          # Reuse today's branch if a prior run already created it.
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "Branch $branch already exists on origin; a sync PR is likely open."
+            exit 0
+          fi
+
+          # Push upstream's tip to a fork branch and open a PR into main so the
+          # diff/conflicts surface in the PR UI for review.
+          git push origin "upstream/main:refs/heads/$branch"
+
+          body="Automated weekly sync of upstream/main. Review for conflicts with"
+          body="$body fork-only files (docs, README, portmanteaus, packaging) first."
+          gh pr create --base main --head "$branch" \
+            --title "Sync from upstream nvie/git-toolbelt ($ahead commit(s))" \
+            --body "$body"
