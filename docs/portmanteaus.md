@@ -16,8 +16,8 @@ Most of these are **thin**: a one-line `exec git <verb> "$@"` that just forwards
 | `gull` | `exec git pull "$@"` | | `granch` | `exec git branch "$@"` |
 | `gulp` | fetches, then `exec git pull "$@"`; aborts if the fetch fails | | `gtash` | `exec git stash "$@"` |
 | `gush` | `exec git push-current "$@"` — **smart**, delegates to [`git-push-current`](commands.md#git-push-current) | | `gadd` | `exec git add "$@"` |
-| `gommit` | `exec git commit "$@"` | | `gmend` | `exec git commit --amend "$@"` |
-| `gtatus` | `exec git status "$@"` | | `giff` | `exec git diff "$@"` |
+| `gommit` | `exec git commit "$@"` | | `gamend` | `exec git commit --amend "$@"` |
+| `gatus` | `exec git status "$@"` | | `giff` | `exec git diff "$@"` |
 | `gout` | `exec git workon "$@"` — **smart**, delegates to [`git-workon`](commands.md#git-workon) | | `gome` | `exec git checkout "$(git main-branch)"` — **smart**, delegates to [`git-main-branch`](commands.md#git-main-branch) |
 
 All of the `checkout`-flavored shortcuts (`gout`, `gome`) use `git checkout`, matching this repo's existing convention, not `git switch`.

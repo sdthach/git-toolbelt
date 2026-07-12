@@ -9,8 +9,8 @@ This is a personal fork of [`nvie/git-toolbelt`](https://github.com/nvie/git-too
 ```
 git-toolbelt/                 # fork: github.com/sdthach/git-toolbelt
 ├── git-*  (~70 upstream)     # UNTOUCHED
-├── portmanteaus/             # getch gull gulp gush gadd gommit gmend
-│   └── gtatus giff glog granch gtash gout gome
+├── portmanteaus/             # getch gull gulp gush gadd gommit gamend
+│   └── gatus giff glog granch gtash gout gome
 ├── docs/                     # install / commands / portmanteaus / maintaining-the-fork
 ├── packaging/git-toolbelt.rb # brew formula source of truth
 ├── .github/workflows/        # lint / upstream-sync / release
