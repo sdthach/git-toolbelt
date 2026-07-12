@@ -124,8 +124,8 @@ Short `g`+verb executables — no `git ` prefix needed. Full reference, includin
 - [`gush`](docs/portmanteaus.md#reference) — `git push-current`
 - [`gadd`](docs/portmanteaus.md#reference) — `git add`
 - [`gommit`](docs/portmanteaus.md#reference) — `git commit`
-- [`gmend`](docs/portmanteaus.md#reference) — `git commit --amend`
-- [`gtatus`](docs/portmanteaus.md#reference) — `git status`
+- [`gamend`](docs/portmanteaus.md#reference) — `git commit --amend`
+- [`gatus`](docs/portmanteaus.md#reference) — `git status`
 - [`giff`](docs/portmanteaus.md#reference) — `git diff`
 - [`glog`](docs/portmanteaus.md#reference) — `git log`
 - [`granch`](docs/portmanteaus.md#reference) — `git branch`
