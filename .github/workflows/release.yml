@@ -47,6 +47,7 @@ jobs:
           TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
           URL: ${{ steps.tarball.outputs.url }}
           SHA: ${{ steps.tarball.outputs.sha }}
+          VERSION: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           git clone --quiet \
@@ -55,6 +56,7 @@ jobs:
           import os, re, sys
           path = sys.argv[1]
           url, sha = os.environ["URL"], os.environ["SHA"]
+          version = os.environ["VERSION"].removeprefix("v")
           lines = open(path).read().splitlines()
           out, saw_url, saw_sha = [], False, False
           for line in lines:
@@ -62,6 +64,9 @@ jobs:
                   out.append(f'  url "{url}"'); saw_url = True
               elif re.match(r'\s*#?\s*sha256 "', line):
                   out.append(f'  sha256 "{sha}"'); saw_sha = True
+              elif re.match(r'\s*#?\s*version "', line):
+                  # Homebrew mis-parses "-fork.N" tags, so the version is pinned explicitly.
+                  out.append(f'  version "{version}"')
               else:
                   out.append(line)
           if not (saw_url and saw_sha):
