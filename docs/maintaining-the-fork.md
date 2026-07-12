@@ -37,7 +37,9 @@ Three workflows live in `.github/workflows/`:
 
 ### Manual secret: `TAP_TOKEN`
 
-`release.yml` pushes to a *different* repo (`sdthach/homebrew-tap`), which the default `GITHUB_TOKEN` can't do. One-time setup: create a **fine-grained PAT** with **contents: write** scoped to `sdthach/homebrew-tap`, and add it to this repo as a secret named `TAP_TOKEN` (`gh secret set TAP_TOKEN`). Until that exists (and the tap repo is bootstrapped), `release.yml`'s tap-update step will fail — expected, since releases are a pending follow-up.
+`release.yml` pushes to a *different* repo (`sdthach/homebrew-tap`), which the default `GITHUB_TOKEN` can't do. One-time setup: create a **fine-grained PAT** with **contents: write** scoped to `sdthach/homebrew-tap`, and add it to this repo as a secret named `TAP_TOKEN` (`gh secret set TAP_TOKEN`).
+
+Until `TAP_TOKEN` is configured, `release.yml`'s tap-update step is **skipped gracefully** (the GitHub release is still created, with a `::notice::` in the run) — the `v1.12.0-fork.1` tap update was done by hand. Set the token to automate the tap bump on future releases.
 
 ## Syncing from upstream
 
@@ -63,15 +65,19 @@ The formula supports two install paths (see [`docs/install.md`](install.md)):
 - **`--HEAD`** — installs from the tip of `main`. Available as soon as the tap repo exists.
 - **Stable** — installs a pinned `vX.Y.Z` tarball. Requires the formula's `url`/`sha256` to be filled, which happens the first time a release is cut.
 
-Today the formula ships **`--HEAD`-only**: its stable `url`/`sha256` stanza is commented out until the first fork release.
+Both modes are live as of `v1.12.0-fork.1`. In `packaging/git-toolbelt.rb` (the source of truth) the stable `url`/`sha256`/`version` stanza is kept commented as a template; the tap copy carries the populated values.
 
-### One-time tap bootstrap — ⏳ pending (follow-up session)
+> **Version pin gotcha:** Homebrew mis-parses a `-fork.N` tag (e.g. `v1.12.0-fork.1`) down to a bare `1`, which breaks `brew upgrade` detection. The formula therefore pins `version "1.12.0-fork.1"` explicitly, and `release.yml` rewrites that line (alongside `url`/`sha256`) on each release.
 
-Not done yet (deferred to a machine with `brew`/`ruby` so the install can actually be tested end-to-end):
+### One-time tap bootstrap — ✅ done (v1.12.0-fork.1)
 
-1. `gh repo create sdthach/homebrew-tap --public -d "Homebrew tap for my git-toolbelt fork"`.
-2. Copy `packaging/git-toolbelt.rb` into the tap repo; commit and push.
-3. Verify: `brew tap sdthach/tap && brew install --HEAD sdthach/tap/git-toolbelt`, then confirm both a `git-*` command (e.g. `git sha`) and a portmanteau (e.g. `getch`, `gush`) resolve.
+The tap (`github.com/sdthach/homebrew-tap`) is published and seeded, and both install paths were smoke-tested end-to-end on Linux/WSL (`brew install` stable + `--HEAD`, and `brew test` passing). For reference, the bootstrap was:
+
+1. `gh repo create sdthach/homebrew-tap --public` (empty).
+2. Seed `git-toolbelt.rb` (HEAD + populated stable stanza) and a README; push to `main`.
+3. Verify: `brew install sdthach/tap/git-toolbelt` (and `--HEAD`), confirm a `git-*` command (e.g. `git sha`) and a portmanteau (e.g. `getch`, `gush`) resolve, and `brew test git-toolbelt` passes.
+
+The tap's `main` is protected against force-push/deletion (but not behind a PR gate, so `release.yml` can push formula bumps directly).
 
 ### Cutting a release (per version)
 

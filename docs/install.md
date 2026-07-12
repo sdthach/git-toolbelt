@@ -13,23 +13,23 @@ Back to the [README](../README.md).
 
 Installation is identical on macOS and on Linux/WSL — there's a single tap and formula for both.
 
-> **Status:** the tap repo (`sdthach/homebrew-tap`) and the first tagged release haven't been cut yet, so today the formula is **`--HEAD`-only** (see option 1). Option 2 (a pinned stable release) becomes available once the first `v*` tag is pushed and the release workflow fills in the formula's `url`/`sha256`.
+Both install modes are live as of `v1.12.0-fork.1` — the tap (`sdthach/homebrew-tap`) is published and the first release is cut.
 
-### Option 1 — `--HEAD` (available now)
-
-Tracks the tip of `main`, so you get fork changes immediately:
-
-```console
-$ brew tap sdthach/tap
-$ brew install --HEAD sdthach/tap/git-toolbelt
-```
-
-### Option 2 — stable release (after the first release is cut)
+### Option 1 — stable release (recommended)
 
 Installs the latest tagged version:
 
 ```console
 $ brew install sdthach/tap/git-toolbelt
+```
+
+### Option 2 — `--HEAD`
+
+Tracks the tip of `main`, so you get fork changes immediately (before they're tagged):
+
+```console
+$ brew tap sdthach/tap
+$ brew install --HEAD sdthach/tap/git-toolbelt
 ```
 
 You can move between them later — `brew install --HEAD …` to switch to the tip, or `brew install …` to switch back to the released version (Homebrew will offer to switch off `--HEAD`).

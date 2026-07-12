@@ -19,9 +19,10 @@ class GitToolbelt < Formula
   license "BSD-3-Clause"
   head "https://github.com/sdthach/git-toolbelt.git", branch: "main"
 
-  # --- Stable stanza (populated by .github/workflows/release.yml) ---
+  # --- Stable stanza (populated in the tap by .github/workflows/release.yml) ---
   # url "https://github.com/sdthach/git-toolbelt/archive/refs/tags/vX.Y.Z.tar.gz"
   # sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  # version "X.Y.Z"  # pinned: brew mis-parses "-fork.N" tags down to a bare number
 
   # git-relative-path needs GNU realpath; native on Linux, provided here for macOS.
   depends_on "coreutils"
@@ -36,8 +37,13 @@ class GitToolbelt < Formula
     assert_path_exists bin/"git-main-branch"
     assert_path_exists bin/"getch"
 
-    system "git", "-C", testpath, "init", "-q"
-    ENV["PATH"] = "#{bin}:#{ENV["PATH"]}"
-    assert_equal "main", shell_output("git -C #{testpath} symbolic-ref --short HEAD").strip
+    # git-main-branch actually resolves the main branch. Force the default branch
+    # name and add a commit so the probe has a real branch to find, independent of
+    # the ambient init.defaultBranch (brew's sandbox leaves it as "master").
+    ENV.prepend_path "PATH", bin
+    system "git", "-C", testpath, "-c", "init.defaultBranch=main", "init", "-q"
+    system "git", "-C", testpath, "-c", "user.name=brew", "-c", "user.email=brew@example.com",
+           "commit", "-q", "--allow-empty", "-m", "init"
+    assert_equal "main", shell_output("git -C #{testpath} main-branch").strip
   end
 end
