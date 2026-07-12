@@ -3,8 +3,11 @@ name: release
 # On a pushed v* tag: create the GitHub release, hash the source tarball, and
 # push the updated url+sha256 into the sdthach/homebrew-tap formula.
 #
-# Requires a repo secret TAP_TOKEN: a fine-grained PAT with contents:write on
-# sdthach/homebrew-tap. The default GITHUB_TOKEN cannot push to another repo.
+# The tap-update step needs a repo secret TAP_TOKEN: a fine-grained PAT with
+# contents:write on sdthach/homebrew-tap (the default GITHUB_TOKEN cannot push
+# to another repo). When TAP_TOKEN is not configured, that step is skipped
+# gracefully (the GitHub release is still created) rather than failing the run —
+# useful for the first release, which is bootstrapped by hand.
 
 on:
   push:
@@ -17,6 +20,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      HAS_TAP_TOKEN: ${{ secrets.TAP_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -37,6 +42,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Update homebrew-tap formula
+        if: env.HAS_TAP_TOKEN == 'true'
         env:
           TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
           URL: ${{ steps.tarball.outputs.url }}
@@ -67,3 +73,10 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -am "git-toolbelt $GITHUB_REF_NAME"
           git push
+
+      - name: Note skipped tap update
+        if: env.HAS_TAP_TOKEN != 'true'
+        run: |
+          echo "::notice::TAP_TOKEN not set — skipped the homebrew-tap formula update." \
+               "The GitHub release was still created; update sdthach/homebrew-tap by hand" \
+               "or set TAP_TOKEN to automate future releases."

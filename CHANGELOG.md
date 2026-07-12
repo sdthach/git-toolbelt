@@ -1,4 +1,4 @@
-# Unreleased (fork)
+# v1.12.0-fork.1
 
 - New `portmanteaus/` set of `g`+verb shortcut commands for the everyday workflow:
   `getch` (fetch), `gull` (pull), `gulp` (fetch + pull), `gush` (push-current),
