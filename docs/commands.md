@@ -138,6 +138,8 @@ To restrict the result to one or more paths, pass pathspecs after `--`. For exam
 $ git modified -- .
 ```
 
+> **Cross-platform:** this command uses portable `awk` instead of `rev` (which Git for Windows / Git Bash does not ship), so it works everywhere. See the [fix](https://github.com/sdthach/git-toolbelt/commit/a10fd2c47e6e365073dc21ab0caf4ac69465ca65) for [nvie#29](https://github.com/nvie/git-toolbelt/issues/29).
+
 ### git modified-since
 
 Like git-modified, but for printing a list of files that have been modified since main (or whatever commit specified). In contrast to git status, it does not include any detailed file status, and never includes non-existing files.
