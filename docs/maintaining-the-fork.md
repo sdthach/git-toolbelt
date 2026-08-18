@@ -100,6 +100,6 @@ Versions are computed by [release-please](https://github.com/googleapis/release-
 
 This has one consequence worth internalizing: **a commit with a non-conventional subject is invisible to versioning.** It gets no CHANGELOG entry and triggers no bump. Since upstream's commits are all free-form, the `upstream-sync` PR is titled `feat: sync upstream …` and is meant to be squash-merged so that one classified subject is what lands.
 
-`.release-please-manifest.json` seeds the version line at `1.12.0` — the upstream release this fork forked from — so the breaking mise/Homebrew change computes `2.0.0`.
+`.release-please-manifest.json` seeds the version line at `1.12.0` — the upstream release this fork forked from — so the breaking mise/Homebrew change computes `2.0.0`. There is no `v1.12.0` *tag*, though: upstream's newest tag is `v1.11.0`, and 1.12.0 exists only as an untagged CHANGELOG entry on its main. `last-release-sha` in [`release-please-config.json`](../release-please-config.json) therefore pins where that notional release sat (`9d8a133`, the last upstream commit before the fork's first), so release-please bounds its scan at the fork boundary instead of walking the entire history. Once `v2.0.0` is tagged, release-please uses that tag and the pin is inert.
 
 See **[`PUBLISHING.md`](../PUBLISHING.md)** for the step-by-step runbook, the conventional-commit reference table, the `TAP_TOKEN` setup, and how to build a release by hand if Actions is unavailable.
