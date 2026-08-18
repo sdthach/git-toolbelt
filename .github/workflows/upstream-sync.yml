@@ -17,7 +17,7 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -47,8 +47,15 @@ jobs:
           # diff/conflicts surface in the PR UI for review.
           git push origin "upstream/main:refs/heads/$branch"
 
+          # Squash-merge this PR. Upstream's own commit subjects are free-form
+          # and release-please cannot classify them; squashing lands the single
+          # conventional subject below, so the sync produces exactly one
+          # CHANGELOG entry and one version bump.
           body="Automated weekly sync of upstream/main. Review for conflicts with"
           body="$body fork-only files (docs, README, portmanteaus, scripts) first."
+          body="$body\n\n**Squash-merge this PR** so release-please sees one"
+          body="$body classified subject instead of upstream's unclassifiable ones."
+          body="$body Retitle to \`fix:\` if the sync is fixes only."
           gh pr create --base main --head "$branch" \
-            --title "Sync from upstream nvie/git-toolbelt ($ahead commit(s))" \
-            --body "$body"
+            --title "feat: sync upstream nvie/git-toolbelt ($ahead commit(s))" \
+            --body "$(printf '%b' "$body")"

@@ -1,66 +1,114 @@
 name: release
 
-# On a pushed v* tag: build the distributable tarball, publish it as a GitHub
-# release asset, and attest its provenance.
+# Versioning is automated by release-please, which reads the conventional-commit
+# subjects landed on main and keeps a "chore: release X.Y.Z" PR open with the
+# computed version and the CHANGELOG diff. Merging that PR is the act of
+# releasing: it tags, creates the GitHub release, and then this same workflow
+# run builds and attaches the artifacts.
 #
-# The release asset is what `mise` installs — the github backend downloads
-# release *assets* and ignores GitHub's auto-generated source tarballs, so this
-# workflow (not the tag alone) is what makes a version installable.
+# Doing both halves in one workflow is deliberate. A tag pushed by GITHUB_TOKEN
+# does not trigger other workflows, so a separate `on: push: tags` job would
+# never fire without a PAT.
 #
-# Asset naming matters and is load-bearing:
-#   git-toolbelt-<version>.tar.gz         picked by mise's asset autodetection
-#   git-toolbelt-<version>.tar.gz.sha256  exact-matched by mise and verified
-# See docs/maintaining-the-fork.md for why those names work with zero tool
-# options on the user's side.
+# One artifact serves both distribution paths:
+#   git-toolbelt-<version>.tar.gz         mise's asset; also the Homebrew `url`
+#   git-toolbelt-<version>.tar.gz.sha256  mise matches this name and verifies it
+# Asset naming is load-bearing for mise — see docs/maintaining-the-fork.md.
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
 
 permissions:
   contents: write
-  id-token: write
-  attestations: write
+  issues: write
+  pull-requests: write
 
 jobs:
-  release:
+  release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: googleapis/release-please-action@v5
+        id: release
 
-      - name: Reject a version the ecosystem mis-parses
-        run: |
-          set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          # The fork owns its own semver line (see PUBLISHING.md). Pre-release
-          # suffixes sort as prereleases in mise and are excluded from `latest`,
-          # so a plain X.Y.Z tag is required.
-          if ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::tag '$GITHUB_REF_NAME' is not vMAJOR.MINOR.PATCH" >&2
-            exit 1
-          fi
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      TAG: ${{ needs.release-please.outputs.tag_name }}
+      VERSION: ${{ needs.release-please.outputs.version }}
+      HAS_TAP_TOKEN: ${{ secrets.TAP_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
 
       - name: Build the release tarball
+        id: build
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          scripts/build-dist.sh "$version" dist
-          cd dist
-          sha256sum "git-toolbelt-$version.tar.gz" \
-            > "git-toolbelt-$version.tar.gz.sha256"
-          ls -l
+          scripts/build-dist.sh "$VERSION" dist
+          tarball="git-toolbelt-$VERSION.tar.gz"
+          ( cd dist && sha256sum "$tarball" > "$tarball.sha256" )
+          {
+            echo "url=https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${tarball}"
+            echo "sha=$(cut -d' ' -f1 < "dist/$tarball.sha256")"
+          } >> "$GITHUB_OUTPUT"
+          ls -l dist
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/*.tar.gz
 
-      - name: Create the GitHub release
+      - name: Attach assets to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$TAG" dist/* --clobber
+
+      # The tap copy is replaced wholesale from packaging/git-toolbelt.rb rather
+      # than patched in place, so edits to the formula body (deps, test block)
+      # reach the tap too instead of having to be re-applied there by hand.
+      - name: Update the homebrew-tap formula
+        if: env.HAS_TAP_TOKEN == 'true'
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          URL: ${{ steps.build.outputs.url }}
+          SHA: ${{ steps.build.outputs.sha }}
         run: |
           set -euo pipefail
-          gh release create "$GITHUB_REF_NAME" \
-            --verify-tag --generate-notes \
-            dist/*.tar.gz dist/*.tar.gz.sha256
+          git clone --quiet \
+            "https://x-access-token:${TAP_TOKEN}@github.com/sdthach/homebrew-tap.git" tap
+          cp packaging/git-toolbelt.rb tap/git-toolbelt.rb
+          sed -i -E \
+            -e "s|^(\s*)url \".*\"|\1url \"$URL\"|" \
+            -e "s|^(\s*)sha256 \".*\"|\1sha256 \"$SHA\"|" \
+            tap/git-toolbelt.rb
+          grep -q "url \"$URL\"" tap/git-toolbelt.rb
+          grep -q "sha256 \"$SHA\"" tap/git-toolbelt.rb
+          cd tap
+          if git diff --quiet; then
+            echo "::notice::tap formula already current for $TAG — nothing to push."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "git-toolbelt $TAG"
+          git push
+
+      - name: Note skipped tap update
+        if: env.HAS_TAP_TOKEN != 'true'
+        run: |
+          echo "::notice::TAP_TOKEN not set — skipped the homebrew-tap formula update." \
+               "The release and its assets were still published, so the mise install" \
+               "path is live; bump sdthach/homebrew-tap by hand or set TAP_TOKEN."

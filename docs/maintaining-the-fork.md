@@ -2,7 +2,7 @@
 
 Back to the [README](../README.md).
 
-This is a personal fork of [`nvie/git-toolbelt`](https://github.com/nvie/git-toolbelt) under GitHub user `sdthach` (repo: `github.com/sdthach/git-toolbelt`), extended with the `portmanteaus/` shortcut set, this `docs/` layout, and mise-based distribution that works identically on macOS and Linux/WSL. Everything added here is additive — the upstream `git-*` scripts are left untouched so merges from upstream stay clean.
+This is a personal fork of [`nvie/git-toolbelt`](https://github.com/nvie/git-toolbelt) under GitHub user `sdthach` (repo: `github.com/sdthach/git-toolbelt`), extended with the `portmanteaus/` shortcut set, this `docs/` layout, and dual mise/Homebrew distribution that works identically on macOS and Linux/WSL. Everything added here is additive — the upstream `git-*` scripts are left untouched so merges from upstream stay clean.
 
 ## Layout
 
@@ -15,11 +15,17 @@ git-toolbelt/                 # fork: github.com/sdthach/git-toolbelt
 ├── scripts/
 │   ├── build-dist.sh         # assembles the release tarball
 │   └── smoke-test.sh         # builds it and exercises it like an install
+├── packaging/git-toolbelt.rb # brew formula source of truth
 ├── .github/workflows/        # ci / upstream-sync / release
 ├── mise.toml                 # dev PATH + tools + lint/build/smoke/ci tasks
 ├── .envrc                    # direnv shim; delegates to mise
+├── version.txt               # bumped by release-please
+├── release-please-config.json / .release-please-manifest.json
 ├── README.md                 # slimmed to a hub → docs/
 └── CHANGELOG.md / PUBLISHING.md / LICENSE
+
+homebrew-tap/                 # separate repo: github.com/sdthach/homebrew-tap
+└── git-toolbelt.rb           # replaced wholesale from packaging/ on each release
 ```
 
 ### Repo layout vs. shipped layout
@@ -35,7 +41,11 @@ Keeping `git-*` at the root is what makes the weekly upstream sync a no-op merge
 
 The flattening happens instead in [`scripts/build-dist.sh`](../scripts/build-dist.sh) at release time, so the shipped archive gets the single `bin/` directory that installers want without the repo paying for it.
 
-## How mise installs this
+## How the two install paths work
+
+mise and Homebrew install the **same artifact**: the `git-toolbelt-<version>.tar.gz` release asset that [`scripts/build-dist.sh`](../scripts/build-dist.sh) produces. One tarball, one `sha256`, one `bin/` layout — the paths cannot drift apart, and a bug reproduced under one is a bug under the other.
+
+### mise
 
 `mise use -g github:sdthach/git-toolbelt` works with **zero tool options**, and three details in the release are what make that true. All three are asserted by CI, so they can't quietly regress:
 
@@ -44,6 +54,12 @@ The flattening happens instead in [`scripts/build-dist.sh`](../scripts/build-dis
 3. **The asset is named `git-toolbelt-<version>.tar.gz`.** mise scores assets for platform fit and discards anything scoring ≤ 0. This name scores +10 as a recognized archive format and +20 for matching the repo name, with no OS or architecture token to mismatch against — so the one platform-independent build is selected on every OS and arch.
 
 A `git-toolbelt-<version>.tar.gz.sha256` asset rides along: mise looks for exactly that name and verifies the download against it. Its `.sha256` extension is heavily penalized in asset scoring, so it can never be mistaken for the tool itself. Releases also carry GitHub build-provenance attestations, which mise verifies when present; `github_attestations = false` on the tool is the escape hatch if that service ever blocks an install.
+
+### Homebrew
+
+The formula's `url` points at that same release asset, so `def install` is just `bin.install Dir["bin/*"]`. A `--HEAD` build gets the repo layout instead of the tarball, so the formula falls back to installing `git-*` and `portmanteaus/*` separately when there's no `bin/` — that branch is what keeps `--HEAD` working.
+
+[`packaging/git-toolbelt.rb`](../packaging/git-toolbelt.rb) is the source of truth. On each release the workflow copies it over the tap's copy wholesale and rewrites only `url` and `sha256`, so formula edits (dependencies, the `test do` block) propagate. Earlier this was a patch-in-place, and the tap accumulated two commits — a test-block fix and a version pin — that never made it back here; the copy-wholesale approach is what prevents that recurring.
 
 Because everything here is POSIX `sh`, there is one noarch build rather than a matrix.
 
@@ -60,7 +76,7 @@ Three workflows live in `.github/workflows/`:
   - `lint` — `shellcheck` on `portmanteaus/*` and `scripts/*.sh` at full severity (the fork's own scripts) and on the upstream `git-*` scripts at `--severity=error` only (they carry pre-existing style/info/warning findings that we deliberately don't "fix", to keep upstream merges clean), plus `yamllint` on the workflows.
   - `smoke` — builds the release tarball, extracts it, and runs `git main-branch` / `git current-branch` off its `bin/`, checking the archive shape and that every shipped command is executable. This is what stops a broken release from being discovered by users.
 - **`upstream-sync.yml`** — weekly cron + manual `workflow_dispatch`. Pushes `upstream/main`'s tip to an `upstream-sync/<date>` branch and opens a PR into `main` (never an auto-merge — conflicts with fork-only files surface in the PR for review).
-- **`release.yml`** — on a pushed `v*` tag. Validates the tag shape, builds the tarball and its `.sha256`, attests build provenance, and creates the GitHub release with both attached. No repository secrets are required.
+- **`release.yml`** — on every push to `main`. Runs release-please, which maintains the release PR; when that PR merges, the same run builds the tarball and its `.sha256`, attests build provenance, attaches both to the release release-please just created, and bumps the tap formula. Only the tap bump needs a secret (`TAP_TOKEN`), and it skips gracefully without one.
 
 ## Syncing from upstream
 
@@ -77,10 +93,12 @@ Because the upstream `git-*` scripts are never modified — and never moved — 
 
 If upstream adds a new `git-*` command, it needs no packaging work: `build-dist.sh` globs `git-*`, so it ships automatically. It does deserve an entry in [`docs/commands.md`](commands.md) and the README index.
 
-## Releases
+## Versioning and releases
 
-See **[`PUBLISHING.md`](../PUBLISHING.md)** for the step-by-step runbook — version numbering (plain `vX.Y.Z`, enforced by the workflow), the CHANGELOG/tag steps, and how to build the asset by hand if Actions is unavailable.
+Versions are computed by [release-please](https://github.com/googleapis/release-please) from conventional-commit subjects on `main`, not chosen by hand. It keeps a `chore: release X.Y.Z` PR open with the computed version and CHANGELOG diff; merging that PR tags, releases, and triggers the artifact build. `version.txt` and `CHANGELOG.md` are maintained by it — don't hand-edit them outside its PR.
 
-### Homebrew (retired)
+This has one consequence worth internalizing: **a commit with a non-conventional subject is invisible to versioning.** It gets no CHANGELOG entry and triggers no bump. Since upstream's commits are all free-form, the `upstream-sync` PR is titled `feat: sync upstream …` and is meant to be squash-merged so that one classified subject is what lands.
 
-Earlier versions of this fork shipped through a Homebrew tap (`sdthach/homebrew-tap`) with a `packaging/git-toolbelt.rb` formula. That path is retired in favour of mise: it needed a second repo, a `TAP_TOKEN` secret to push across repos, and an explicit `version` pin to work around Homebrew mis-parsing the old `-fork.N` tags. The tap repo still exists and is untouched by this repo's automation — archive or delete it when convenient, and note that anyone still on `brew install sdthach/tap/git-toolbelt` will stay pinned at `v1.12.0-fork.1` until they switch to mise.
+`.release-please-manifest.json` seeds the version line at `1.12.0` — the upstream release this fork forked from — so the breaking mise/Homebrew change computes `2.0.0`.
+
+See **[`PUBLISHING.md`](../PUBLISHING.md)** for the step-by-step runbook, the conventional-commit reference table, the `TAP_TOKEN` setup, and how to build a release by hand if Actions is unavailable.

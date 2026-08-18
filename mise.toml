@@ -29,8 +29,8 @@ run = [
 ]
 
 [tasks.build]
-description = "Assemble the release tarball into dist/ (VERSION=x.y.z to override)"
-run = 'scripts/build-dist.sh "${VERSION:-0.0.0-dev}" dist'
+description = "Assemble the release tarball into dist/ (VERSION=x.y.z to override version.txt)"
+run = 'scripts/build-dist.sh "${VERSION:-}" dist'
 
 [tasks.smoke]
 description = "Build the tarball and exercise it the way an install does"

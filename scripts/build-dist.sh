@@ -2,8 +2,10 @@
 #
 # Assemble the release tarball that `mise` (and anyone else) installs from.
 #
-#   usage: scripts/build-dist.sh <version> [outdir]
+#   usage: scripts/build-dist.sh [version] [outdir]
 #   e.g.   scripts/build-dist.sh 2.0.0 dist
+#
+# The version defaults to version.txt, which release-please keeps current.
 #
 # The repo keeps the upstream `git-*` scripts at its root (byte-identical to
 # nvie/git-toolbelt, so upstream-sync merges stay clean) and the fork's
@@ -28,7 +30,12 @@ version="${1:-}"
 outdir="${2:-dist}"
 
 if [ -z "$version" ]; then
-    echo "usage: $0 <version> [outdir]" >&2
+    # release-please bumps version.txt in the release PR, so an argument-less
+    # build always matches the version the next release will carry.
+    version="$(cat "$(dirname -- "$0")/../version.txt" 2>/dev/null || true)"
+fi
+if [ -z "$version" ]; then
+    echo "usage: $0 [version] [outdir]  (no version.txt to fall back on)" >&2
     exit 2
 fi
 

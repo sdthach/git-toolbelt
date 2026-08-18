@@ -8,13 +8,14 @@ Helper tools to make everyday life with Git much easier — a set of small, focu
 
 ## Prerequisites & install
 
-Requires [mise](https://mise.jdx.dev) and `git`; a couple of commands have optional dependencies (`realpath` from GNU coreutils, `fzf`). The commands are pure POSIX `sh`, so one platform-independent build covers macOS, Linux, and WSL alike:
+Requires `git` plus either [mise](https://mise.jdx.dev) or [Homebrew](https://brew.sh); a couple of commands have optional dependencies (`realpath` from GNU coreutils, `fzf`). The commands are pure POSIX `sh`, so one platform-independent build covers macOS, Linux, and WSL alike, and both package managers install that same build:
 
 ```console
-$ mise use -g github:sdthach/git-toolbelt
+$ mise use -g github:sdthach/git-toolbelt   # or:
+$ brew install sdthach/tap/git-toolbelt
 ```
 
-That puts all 76 commands on `PATH` — `git-*` scripts as `git <verb>` subcommands, `g`+verb shortcuts as standalone commands. Full details, including version pinning and a note for developing on this repo directly: **[docs/install.md](docs/install.md)**.
+Either puts all 76 commands on `PATH` — `git-*` scripts as `git <verb>` subcommands, `g`+verb shortcuts as standalone commands. Full details, including version pinning, `--HEAD` builds, and a note for developing on this repo directly: **[docs/install.md](docs/install.md)**.
 
 ## Layout
 
@@ -24,6 +25,7 @@ git-toolbelt/
 ├── portmanteaus/  # 14 g+verb shortcuts: getch, gadd, gommit, gush, ... (see docs/portmanteaus.md)
 ├── docs/          # install / commands / portmanteaus / maintaining-the-fork
 ├── scripts/       # build-dist.sh (release tarball) + smoke-test.sh
+├── packaging/     # Homebrew formula, source of truth for the tap copy
 ├── mise.toml      # dev environment + lint/build/smoke tasks
 └── CHANGELOG.md / PUBLISHING.md / LICENSE
 ```
