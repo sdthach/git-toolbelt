@@ -1,0 +1,41 @@
+# Dev environment for working *on* this repo. This is not how the toolbelt is
+# installed — see docs/install.md for that.
+
+[tools]
+# The same linters CI uses, so `mise run lint` locally matches the CI result.
+shellcheck = "latest"
+# yamllint ships as a Python tool; uv is what mise installs it with.
+uv = "latest"
+yamllint = "latest"
+
+[env]
+# The working tree keeps the upstream git-* scripts at the root and the fork's
+# shortcuts in portmanteaus/; only the release tarball flattens both into bin/.
+# Put both directories on PATH so the commands resolve while you edit them.
+_.path = [".", "portmanteaus"]
+
+[tasks.lint]
+description = "shellcheck everything, at the same severities CI uses"
+run = [
+  # The fork's own scripts are held to shellcheck's full default severity.
+  "shellcheck -s sh portmanteaus/* scripts/*.sh",
+  # Upstream git-* scripts stay byte-for-byte identical to nvie/git-toolbelt so
+  # upstream merges stay clean, and they carry pre-existing style/info/warning
+  # findings. Lint them at error severity to catch genuine bugs from a future
+  # upstream merge without failing on inherited style noise.
+  "shellcheck --severity=error git-*",
+  # .yamllint tunes this for GitHub Actions workflows.
+  "yamllint .github .yamllint",
+]
+
+[tasks.build]
+description = "Assemble the release tarball into dist/ (VERSION=x.y.z to override)"
+run = 'scripts/build-dist.sh "${VERSION:-0.0.0-dev}" dist'
+
+[tasks.smoke]
+description = "Build the tarball and exercise it the way an install does"
+run = "scripts/smoke-test.sh"
+
+[tasks.ci]
+description = "Everything CI runs"
+depends = ["lint", "smoke"]

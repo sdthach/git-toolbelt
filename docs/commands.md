@@ -284,7 +284,7 @@ Amend all local staged changes into the last commit. Ideal for fixing typo's, wh
 
 ### git fixup-with
 
-Interactively lets you pick a commit to fixup with. (Uses `fzf` for the interactive picking. Use `brew install fzf` to install this tool separately.) Use `-r` to trigger an interactive rebase right afterwards.
+Interactively lets you pick a commit to fixup with. (Uses `fzf` for the interactive picking. Use `mise use -g fzf` to install this tool separately.) Use `-r` to trigger an interactive rebase right afterwards.
 
 ### git workon
 

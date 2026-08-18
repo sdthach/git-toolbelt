@@ -6,24 +6,29 @@
 
 Helper tools to make everyday life with Git much easier — a set of small, focused `git-*` scripts that each install as their own `git <verb>` subcommand, plus a set of short `g`+verb shortcuts for the ones you reach for the most. This is a personal fork of [`nvie/git-toolbelt`](https://github.com/nvie/git-toolbelt); see [`docs/maintaining-the-fork.md`](docs/maintaining-the-fork.md) for how it relates to upstream.
 
+## Prerequisites & install
+
+Requires [mise](https://mise.jdx.dev) and `git`; a couple of commands have optional dependencies (`realpath` from GNU coreutils, `fzf`). The commands are pure POSIX `sh`, so one platform-independent build covers macOS, Linux, and WSL alike:
+
+```console
+$ mise use -g github:sdthach/git-toolbelt
+```
+
+That puts all 76 commands on `PATH` — `git-*` scripts as `git <verb>` subcommands, `g`+verb shortcuts as standalone commands. Full details, including version pinning and a note for developing on this repo directly: **[docs/install.md](docs/install.md)**.
+
 ## Layout
 
 ```
 git-toolbelt/
-├── git-*          # ~70 standalone git subcommands (see docs/commands.md)
-├── portmanteaus/  # g+verb shortcuts: getch, gadd, gommit, gush, ... (see docs/portmanteaus.md)
+├── git-*          # 62 standalone git subcommands (see docs/commands.md)
+├── portmanteaus/  # 14 g+verb shortcuts: getch, gadd, gommit, gush, ... (see docs/portmanteaus.md)
 ├── docs/          # install / commands / portmanteaus / maintaining-the-fork
+├── scripts/       # build-dist.sh (release tarball) + smoke-test.sh
+├── mise.toml      # dev environment + lint/build/smoke tasks
 └── CHANGELOG.md / PUBLISHING.md / LICENSE
 ```
 
-## Prerequisites & install
-
-Requires `git`; a couple of commands have optional dependencies (`realpath` from GNU coreutils, `fzf`). Install via the Homebrew tap — identical on macOS and Linux/WSL. Full details, including the `--HEAD` variant and a note for developing on this repo directly: **[docs/install.md](docs/install.md)**.
-
-```console
-$ brew tap sdthach/tap
-$ brew install sdthach/tap/git-toolbelt
-```
+The repo layout is not the shipped layout: `git-*` stays at the root so merges from upstream stay clean, and [`scripts/build-dist.sh`](scripts/build-dist.sh) flattens both directories into the `bin/` that the release tarball carries. See [`docs/maintaining-the-fork.md`](docs/maintaining-the-fork.md).
 
 ## Commands
 

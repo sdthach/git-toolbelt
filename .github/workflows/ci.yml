@@ -1,0 +1,24 @@
+name: ci
+
+# Runs exactly what `mise run ci` runs locally, via the same mise.toml task
+# definitions — so a green local run and a green CI run can't drift apart.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v2
+        with:
+          experimental: true
+
+      # lint: shellcheck at full severity for the fork's own scripts, error-only
+      #       for the untouched upstream git-* scripts.
+      # smoke: build the release tarball and exercise it the way an install does,
+      #       so a broken archive is caught here rather than at release time.
+      - run: mise run ci

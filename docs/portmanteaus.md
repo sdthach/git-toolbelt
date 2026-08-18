@@ -2,7 +2,7 @@
 
 Back to the [README](../README.md).
 
-`portmanteaus/` holds a set of short, single-word `g`+verb executables — everyday Git operations without the `git ` prefix or without typing the full subcommand name. They live alongside the `git-*` scripts on `PATH` (installed by the same Homebrew formula, or picked up via `.envrc` during in-repo dev) but are standalone commands, not `git <verb>` subcommands — so you run `gadd` (not `git gadd`).
+`portmanteaus/` holds a set of short, single-word `g`+verb executables — everyday Git operations without the `git ` prefix or without typing the full subcommand name. They live alongside the `git-*` scripts on `PATH` (shipped in the same `bin/` directory by the mise install, or picked up from `portmanteaus/` via `mise.toml` during in-repo dev) but are standalone commands, not `git <verb>` subcommands — so you run `gadd` (not `git gadd`).
 
 ## Thin vs. smart
 

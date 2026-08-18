@@ -1,13 +1,17 @@
 name: release
 
-# On a pushed v* tag: create the GitHub release, hash the source tarball, and
-# push the updated url+sha256 into the sdthach/homebrew-tap formula.
+# On a pushed v* tag: build the distributable tarball, publish it as a GitHub
+# release asset, and attest its provenance.
 #
-# The tap-update step needs a repo secret TAP_TOKEN: a fine-grained PAT with
-# contents:write on sdthach/homebrew-tap (the default GITHUB_TOKEN cannot push
-# to another repo). When TAP_TOKEN is not configured, that step is skipped
-# gracefully (the GitHub release is still created) rather than failing the run —
-# useful for the first release, which is bootstrapped by hand.
+# The release asset is what `mise` installs — the github backend downloads
+# release *assets* and ignores GitHub's auto-generated source tarballs, so this
+# workflow (not the tag alone) is what makes a version installable.
+#
+# Asset naming matters and is load-bearing:
+#   git-toolbelt-<version>.tar.gz         picked by mise's asset autodetection
+#   git-toolbelt-<version>.tar.gz.sha256  exact-matched by mise and verified
+# See docs/maintaining-the-fork.md for why those names work with zero tool
+# options on the user's side.
 
 on:
   push:
@@ -16,72 +20,47 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    env:
-      HAS_TAP_TOKEN: ${{ secrets.TAP_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Create GitHub release
+      - name: Reject a version the ecosystem mis-parses
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          # The fork owns its own semver line (see PUBLISHING.md). Pre-release
+          # suffixes sort as prereleases in mise and are excluded from `latest`,
+          # so a plain X.Y.Z tag is required.
+          if ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::tag '$GITHUB_REF_NAME' is not vMAJOR.MINOR.PATCH" >&2
+            exit 1
+          fi
+
+      - name: Build the release tarball
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          scripts/build-dist.sh "$version" dist
+          cd dist
+          sha256sum "git-toolbelt-$version.tar.gz" \
+            > "git-toolbelt-$version.tar.gz.sha256"
+          ls -l
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.tar.gz
+
+      - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
-
-      - name: Compute tarball sha256
-        id: tarball
         run: |
           set -euo pipefail
-          url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz"
-          sha="$(curl -fsSL "$url" | sha256sum | cut -d' ' -f1)"
-          {
-            echo "url=$url"
-            echo "sha=$sha"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Update homebrew-tap formula
-        if: env.HAS_TAP_TOKEN == 'true'
-        env:
-          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
-          URL: ${{ steps.tarball.outputs.url }}
-          SHA: ${{ steps.tarball.outputs.sha }}
-          VERSION: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          git clone --quiet \
-            "https://x-access-token:${TAP_TOKEN}@github.com/sdthach/homebrew-tap.git" tap
-          python3 - "tap/git-toolbelt.rb" <<'PY'
-          import os, re, sys
-          path = sys.argv[1]
-          url, sha = os.environ["URL"], os.environ["SHA"]
-          version = os.environ["VERSION"].removeprefix("v")
-          lines = open(path).read().splitlines()
-          out, saw_url, saw_sha = [], False, False
-          for line in lines:
-              if re.match(r'\s*#?\s*url "https://github.com/sdthach/git-toolbelt/archive', line):
-                  out.append(f'  url "{url}"'); saw_url = True
-              elif re.match(r'\s*#?\s*sha256 "', line):
-                  out.append(f'  sha256 "{sha}"'); saw_sha = True
-              elif re.match(r'\s*#?\s*version "', line):
-                  # Homebrew mis-parses "-fork.N" tags, so the version is pinned explicitly.
-                  out.append(f'  version "{version}"')
-              else:
-                  out.append(line)
-          if not (saw_url and saw_sha):
-              sys.exit("tap formula has no url/sha256 stanza to update")
-          open(path, "w").write("\n".join(out) + "\n")
-          PY
-          cd tap
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -am "git-toolbelt $GITHUB_REF_NAME"
-          git push
-
-      - name: Note skipped tap update
-        if: env.HAS_TAP_TOKEN != 'true'
-        run: |
-          echo "::notice::TAP_TOKEN not set — skipped the homebrew-tap formula update." \
-               "The GitHub release was still created; update sdthach/homebrew-tap by hand" \
-               "or set TAP_TOKEN to automate future releases."
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag --generate-notes \
+            dist/*.tar.gz dist/*.tar.gz.sha256

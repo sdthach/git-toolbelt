@@ -48,7 +48,7 @@ jobs:
           git push origin "upstream/main:refs/heads/$branch"
 
           body="Automated weekly sync of upstream/main. Review for conflicts with"
-          body="$body fork-only files (docs, README, portmanteaus, packaging) first."
+          body="$body fork-only files (docs, README, portmanteaus, scripts) first."
           gh pr create --base main --head "$branch" \
             --title "Sync from upstream nvie/git-toolbelt ($ahead commit(s))" \
             --body "$body"
