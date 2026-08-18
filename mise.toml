@@ -28,6 +28,10 @@ run = [
   "yamllint .github .yamllint",
 ]
 
+[tasks.setup]
+description = "One-time clone setup: upstream remote (fetch-only) + gh default repo"
+run = "scripts/dev-setup.sh"
+
 [tasks.build]
 description = "Assemble the release tarball into dist/ (VERSION=x.y.z to override version.txt)"
 run = 'scripts/build-dist.sh "${VERSION:-}" dist'

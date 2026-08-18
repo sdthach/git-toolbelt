@@ -66,8 +66,12 @@ If you're working *inside a clone of this repo* rather than installing it, the c
 ```console
 $ mise trust        # once, after cloning
 $ mise install      # shellcheck, yamllint
+$ mise run setup    # once: upstream remote (fetch-only) + gh default repo
 $ mise run ci       # everything CI runs: lint + smoke test
 ```
+
+`mise run setup` configures things that live in `.git/config` and therefore can't
+travel with a clone — see [maintaining-the-fork](maintaining-the-fork.md#remotes).
 
 `direnv` users get the same environment via the checked-in `.envrc` (`direnv allow` once) — it delegates to mise rather than duplicating the `PATH` list.
 

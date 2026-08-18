@@ -69,6 +69,8 @@ Because everything here is POSIX `sh`, there is one noarch build rather than a m
 - `origin` → the fork (`github.com/sdthach/git-toolbelt`) — read/write, this is where feature branches and PRs land.
 - `upstream` → `github.com/nvie/git-toolbelt`, **fetch-only** — pulls in upstream fixes and features, push disabled so there's no risk of accidentally pushing to the original author's repo.
 
+Run **`mise run setup`** in a fresh clone to put both in place ([`scripts/dev-setup.sh`](../scripts/dev-setup.sh)); it is idempotent, so re-running is harmless. These settings live in `.git/config`, which is untracked, so they cannot travel with the repo and are lost on every clone. That is exactly how they rot: the `upstream` push URL was documented as disabled here long before it actually was, and `git push upstream main` would have reached nvie's repo for real. A task that can be run beats a paragraph that has to be remembered.
+
 ## CI/CD (GitHub Actions)
 
 Three workflows live in `.github/workflows/`:
