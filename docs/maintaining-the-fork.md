@@ -122,6 +122,14 @@ Three workflows live in `.github/workflows/`:
 - **`upstream-sync.yml`** — weekly cron + manual `workflow_dispatch`. Pushes `upstream/main`'s tip to an `upstream-sync/<date>` branch and opens a PR into `main` (never an auto-merge — conflicts with fork-only files surface in the PR for review).
 - **`release.yml`** — on every push to `main`. Runs release-please, which maintains the release PR; when that PR merges, the same run builds the tarball and its `.sha256`, attests build provenance, attaches both to the release release-please just created, and bumps the tap formula. Only the tap bump needs a secret (`TAP_TOKEN`), and it skips gracefully without one.
 
+## Review policy
+
+`main` is governed by the `main_protection` ruleset. [`.github/CODEOWNERS`](../.github/CODEOWNERS) assigns every path to `@sdthach`, and the ruleset requires code-owner review — so approving a change into `main` is one person's call, and remains so if collaborators are added later.
+
+The requirement only has meaning while that file exists. With no `CODEOWNERS`, a repository has no code owners, and `require_code_owner_review` blocks every pull request without granting anyone the ability to unblock it. **Deleting or emptying that file silently converts the rule from "one approver" into "nobody can merge".**
+
+Since GitHub does not let anyone approve their own pull request, the sole maintainer's own PRs are merged using the admin bypass the ruleset grants (`gh pr merge <n> --squash --admin`). Expected, not a workaround.
+
 ## Syncing from upstream
 
 The `upstream-sync` workflow automates this weekly, but you can also do it by hand:

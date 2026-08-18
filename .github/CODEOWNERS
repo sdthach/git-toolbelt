@@ -1,0 +1,13 @@
+# Every path in this repository is owned by @sdthach.
+#
+# The main_protection ruleset sets require_code_owner_review, which is only
+# meaningful with this file present: with no CODEOWNERS there are no code
+# owners, so the requirement cannot be satisfied by anyone and simply blocks
+# every pull request. With it, review authority over `main` is @sdthach's alone,
+# and stays that way if collaborators are ever added.
+#
+# GitHub does not let anyone approve their own pull request, so @sdthach's own
+# PRs are merged with the admin bypass the ruleset already grants. That is the
+# intended workflow here, not a misconfiguration.
+
+*       @sdthach
