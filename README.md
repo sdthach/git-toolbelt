@@ -15,13 +15,13 @@ $ mise use -g github:sdthach/git-toolbelt   # or:
 $ brew install sdthach/tap/git-toolbelt
 ```
 
-Either puts all 76 commands on `PATH` — `git-*` scripts as `git <verb>` subcommands, `g`+verb shortcuts as standalone commands. Full details, including version pinning, `--HEAD` builds, and a note for developing on this repo directly: **[docs/install.md](docs/install.md)**.
+Either puts all 77 commands on `PATH` — `git-*` scripts as `git <verb>` subcommands, `g`+verb shortcuts as standalone commands. Full details, including version pinning, `--HEAD` builds, and a note for developing on this repo directly: **[docs/install.md](docs/install.md)**.
 
 ## Layout
 
 ```
 git-toolbelt/
-├── git-*          # 62 standalone git subcommands (see docs/commands.md)
+├── git-*          # 63 standalone git subcommands (see docs/commands.md)
 ├── portmanteaus/  # 14 g+verb shortcuts: getch, gadd, gommit, gush, ... (see docs/portmanteaus.md)
 ├── docs/          # install / commands / portmanteaus / maintaining-the-fork
 ├── scripts/       # build-dist.sh (release tarball) + smoke-test.sh
@@ -35,6 +35,8 @@ The repo layout is not the shipped layout: `git-*` stays at the root so merges f
 ## Commands
 
 Full write-ups live in [`docs/commands.md`](docs/commands.md) (the `git-*` scripts) and [`docs/portmanteaus.md`](docs/portmanteaus.md) (the `g`+verb shortcuts). Below is a quick index — expand a category to jump straight to a command's docs.
+
+Not sure whose git-toolbelt is on your `PATH`? [`git-toolbelt`](docs/commands.md#git-toolbelt) is the one command upstream doesn't ship — `git toolbelt` prints the installed version and identifies this fork.
 
 <details>
 <summary><strong>Everyday</strong></summary>

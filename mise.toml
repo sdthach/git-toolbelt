@@ -18,7 +18,7 @@ _.path = [".", "portmanteaus"]
 description = "shellcheck everything, at the same severities CI uses"
 run = [
   # The fork's own scripts are held to shellcheck's full default severity.
-  "shellcheck -s sh portmanteaus/* scripts/*.sh",
+  "shellcheck -s sh portmanteaus/* scripts/*.sh git-toolbelt",
   # Upstream git-* scripts stay byte-for-byte identical to nvie/git-toolbelt so
   # upstream merges stay clean, and they carry pre-existing style/info/warning
   # findings. Lint them at error severity to catch genuine bugs from a future

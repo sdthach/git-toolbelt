@@ -33,7 +33,7 @@ class GitToolbelt < Formula
     if File.directory?("bin")
       bin.install Dir["bin/*"]
     else
-      bin.install Dir["git-*"]          # the 62 git-<verb> subcommands
+      bin.install Dir["git-*"]          # the 63 git-<verb> subcommands
       bin.install Dir["portmanteaus/*"] # the g+verb shortcuts (getch, gush, gome, ...)
     end
   end

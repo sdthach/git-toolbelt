@@ -58,6 +58,10 @@ check "git main-branch" "main" git -C "$repo" main-branch
 check "git current-branch" "main" git -C "$repo" current-branch
 check "git is-repo" "" git -C "$repo" is-repo
 
+# The identity command must report the version it was built with, not "dev" —
+# a failed stamp would ship a release that cannot say which release it is.
+check "git toolbelt --version" "$version" git toolbelt --version
+
 # A portmanteau shortcut is a standalone command, not a git subcommand.
 if ! command -v gatus >/dev/null; then
     echo "FAIL: portmanteau 'gatus' not on PATH" >&2

@@ -58,6 +58,18 @@ cp -p portmanteaus/* "$stage/bin/"
 cp -pR docs "$stage/docs"
 cp -p README.md CHANGELOG.md LICENSE "$stage/"
 
+# Stamp the version into the shipped copy of git-toolbelt. It can't read
+# version.txt at runtime: under mise's shims $0 is the shim, not the real file,
+# so there is no reliable path back to a sibling data file.
+stamped="$stage/git-toolbelt.stamped"
+sed "s/^VERSION=\"dev\"\$/VERSION=\"$version\"/" "$stage/bin/git-toolbelt" > "$stamped"
+mv "$stamped" "$stage/bin/git-toolbelt"
+chmod +x "$stage/bin/git-toolbelt"
+if ! grep -q "^VERSION=\"$version\"\$" "$stage/bin/git-toolbelt"; then
+    echo "failed to stamp the version into git-toolbelt" >&2
+    exit 1
+fi
+
 # Sanity: every shipped command must be executable and start with a shebang. A
 # botched upstream merge that drops the exec bit would otherwise ship silently
 # and only fail on the user's machine.

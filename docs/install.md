@@ -26,7 +26,7 @@ That records the tool in `~/.config/mise/config.toml`:
 "github:sdthach/git-toolbelt" = "latest"
 ```
 
-All 76 commands land on `PATH` — the `git-*` scripts resolve as `git <verb>` subcommands, and the `g`+verb shortcuts as standalone commands:
+All 77 commands land on `PATH` — the `git-*` scripts resolve as `git <verb>` subcommands, and the `g`+verb shortcuts as standalone commands:
 
 ```console
 $ git main-branch

@@ -9,6 +9,7 @@ This is a personal fork of [`nvie/git-toolbelt`](https://github.com/nvie/git-too
 ```
 git-toolbelt/                 # fork: github.com/sdthach/git-toolbelt
 ├── git-*  (62 upstream)      # UNTOUCHED, at the root, on purpose
+├── git-toolbelt              # fork-only: identifies which build is installed
 ├── portmanteaus/             # getch gull gulp gush gadd gommit gamend
 │   └── gatus giff glog granch gtash gout gome
 ├── docs/                     # install / commands / portmanteaus / maintaining-the-fork
