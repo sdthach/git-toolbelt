@@ -44,7 +44,7 @@ The old `vX.Y.Z-fork.N` scheme is retired. It broke both distribution paths: mis
 
 Fork tags live only in this repo — `upstream` is fetch-only, so a fork tag can never reach `nvie/git-toolbelt`.
 
-> Commits are currently **unsigned** (a signing/vault fix is pending). Add `--no-gpg-sign` to `git commit` until that's resolved.
+> Commits to `main` must carry a **verified signature** — the `main_protection` ruleset enforces it, and an unsigned commit blocks the PR regardless of CI. Configure a signing key once and `mise run setup` will enable signing in the clone; see [maintaining-the-fork](docs/maintaining-the-fork.md#commit-signing).
 
 ## Steps
 
@@ -87,11 +87,55 @@ Both asset names are load-bearing for mise — see [why](docs/maintaining-the-fo
 
 ## One-time: enable the tap bump
 
-The tap bump pushes to a *different* repo (`sdthach/homebrew-tap`), which the default `GITHUB_TOKEN` can't do. Create a **fine-grained PAT** with **contents: write** scoped to `sdthach/homebrew-tap`, then:
+The tap bump pushes to a *different* repo (`sdthach/homebrew-tap`), and the workflow's built-in `GITHUB_TOKEN` is scoped to `sdthach/git-toolbelt` only — it cannot write to another repository no matter what `permissions:` the workflow requests. That is the entire reason this secret exists.
+
+### 1. Create the token
+
+Fine-grained PATs can't be created from the CLI, so this part is the web UI: **[github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new)**
+
+| Field | Value |
+|---|---|
+| Token name | `git-toolbelt tap bump` |
+| Resource owner | `sdthach` |
+| Expiration | your call — a 1-year expiry means one calendar reminder; "no expiration" means never thinking about it again |
+| Repository access | **Only select repositories** → `sdthach/homebrew-tap` |
+| Permissions → Repository → **Contents** | **Read and write** |
+
+Grant nothing else. `Contents: write` is enough to clone and push the formula, and Metadata read-only is added automatically. Do **not** select `sdthach/git-toolbelt` — the token is only ever used to write to the tap.
+
+### 2. Store it as a repo secret
 
 ```console
 $ gh secret set TAP_TOKEN --repo sdthach/git-toolbelt
+? Paste your secret: <paste the token>
+✓ Set Actions secret TAP_TOKEN for sdthach/git-toolbelt
 ```
+
+Or non-interactively, avoiding shell history:
+
+```console
+$ gh secret set TAP_TOKEN --repo sdthach/git-toolbelt < token.txt && rm token.txt
+```
+
+Verify it registered (the value is never readable back):
+
+```console
+$ gh secret list --repo sdthach/git-toolbelt
+```
+
+### 3. Confirm it works
+
+The next release bumps the tap on its own. To exercise it without waiting, re-run the last release workflow — the tap step is the only part that changes behaviour:
+
+```console
+$ gh run list --repo sdthach/git-toolbelt --workflow release.yml --limit 1
+$ gh run rerun <run-id> --repo sdthach/git-toolbelt
+$ git -C /tmp/homebrew-tap log -1        # after cloning, expect "git-toolbelt v2.0.0"
+```
+
+The workflow reads the secret as `HAS_TAP_TOKEN: ${{ secrets.TAP_TOKEN != '' }}` and skips the step when it's empty, so a missing or misnamed secret shows up as a skipped step with a `::notice::` — never as a failed release.
+
+**If it expires**, releases keep succeeding and the tap silently stops updating. That is the failure mode to watch: the `::notice::` in the run log is the only signal. Re-create the token and `gh secret set` it again under the same name.
 
 Until it's set, that step is **skipped gracefully** — the release and its assets still publish, so the mise path stays live, and a `::notice::` reminds you to bump the tap by hand:
 

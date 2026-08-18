@@ -71,6 +71,41 @@ Because everything here is POSIX `sh`, there is one noarch build rather than a m
 
 Run **`mise run setup`** in a fresh clone to put both in place ([`scripts/dev-setup.sh`](../scripts/dev-setup.sh)); it is idempotent, so re-running is harmless. These settings live in `.git/config`, which is untracked, so they cannot travel with the repo and are lost on every clone. That is exactly how they rot: the `upstream` push URL was documented as disabled here long before it actually was, and `git push upstream main` would have reached nvie's repo for real. A task that can be run beats a paragraph that has to be remembered.
 
+## Commit signing
+
+`main` is governed by the `main_protection` ruleset, which requires **verified signatures**. An unsigned commit blocks its own PR no matter how green CI is, and GitHub draws a distinction that is easy to miss:
+
+> An SSH key registered for **authentication** does not verify commit signatures. The same key has to be added a second time as a **signing** key. A key that pushes fine can still leave every commit "Unverified".
+
+Set a key up once, globally, and `mise run setup` enables signing in each clone:
+
+```console
+$ git config --global gpg.format ssh
+$ git config --global user.signingkey ~/.ssh/<key>.pub
+$ gh auth refresh -h github.com -s admin:ssh_signing_key
+$ gh ssh-key add ~/.ssh/<key>.pub --type signing --title "<machine> signing"
+```
+
+GPG works equally well — `git config --global user.signingkey <key-id>` plus `gpg --armor --export <key-id> | gh gpg-key add -`. Either way, check it took with `gh api /users/<you>/ssh_signing_keys --jq length` (or `/gpg_keys`); a `0` there is the reason signatures aren't verifying.
+
+### When signatures still say "Unverified"
+
+GitHub matches a commit to the account that owns its **committer email**, then looks for signing keys *on that account*. Register a key on one account and commit under an email owned by another, and every commit reports `unknown_key` — with matching fingerprints, a correct key type, and registration long predating the commit. Nothing in the UI names the mismatch.
+
+This repo hit exactly that: commits carried `sambo.thach@gmail.com`, which belongs to the `sambothach` account, while the signing keys lived on `sdthach`, the account that owns the repo. Commits are now authored as `106501462+sdthach@users.noreply.github.com` — a noreply address is verified by definition and cannot collide with another account.
+
+Diagnose it in one call, which reports the account GitHub attributed the commit to:
+
+```console
+$ gh api repos/sdthach/git-toolbelt/commits/<sha> \
+    --jq '"\(.author.login)  \(.commit.verification.reason)"'
+sdthach  valid
+```
+
+If that login is not the account holding your signing keys, the email is the problem, not the key.
+
+Commits that GitHub itself creates — squash merges, and release-please's changelog commit — are signed by GitHub and satisfy the rule on their own. Only commits authored locally need your key.
+
 ## CI/CD (GitHub Actions)
 
 Three workflows live in `.github/workflows/`:
