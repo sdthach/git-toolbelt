@@ -27,7 +27,24 @@ fi
 git remote set-url --push upstream DISABLED
 echo "ok: upstream -> $UPSTREAM_URL (push disabled)"
 
-# 3. gh resolves a fork's base repo to its PARENT, so an unqualified
+# 3. main requires a verified signature on every commit (the main_protection
+#    ruleset), so an unsigned commit blocks its own PR no matter how green CI is.
+#    The key itself is personal and machine-specific, so it is never hardcoded
+#    here — this only switches signing on once you have one configured.
+if key="$(git config --get user.signingkey)" && [ -n "$key" ]; then
+    git config commit.gpgsign true
+    git config tag.gpgsign true
+    echo "ok: commit signing enabled (key: $key)"
+else
+    echo "warn: no signing key configured, but main requires verified signatures." >&2
+    echo "      SSH:  git config --global gpg.format ssh" >&2
+    echo "            git config --global user.signingkey ~/.ssh/<key>.pub" >&2
+    echo "            gh ssh-key add ~/.ssh/<key>.pub --type signing" >&2
+    echo "      GPG:  git config --global user.signingkey <key-id>" >&2
+    echo "            gpg --armor --export <key-id> | gh gpg-key add -" >&2
+fi
+
+# 4. gh resolves a fork's base repo to its PARENT, so an unqualified
 #    `gh pr create` here targets nvie/git-toolbelt and fails. Pin it to the fork.
 if command -v gh >/dev/null 2>&1; then
     if gh repo set-default "$FORK" >/dev/null 2>&1; then
