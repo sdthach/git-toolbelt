@@ -130,6 +130,6 @@ CI asserts the shape on every push: [`scripts/smoke-test.sh`](../scripts/smoke-t
 
 ## Still open
 
-- **`require_code_owner_review: true` with no `CODEOWNERS` file.** The requirement cannot be satisfied as configured, so every PR needs an admin bypass. Unchecking it in the `main_protection` ruleset is the fix.
+- **Every PR needs an admin merge, by design.** The `main_protection` ruleset requires code-owner review and [`.github/CODEOWNERS`](../.github/CODEOWNERS) makes `@sdthach` the owner of every path, so review authority over `main` belongs to one person and stays there if collaborators are added. GitHub does not allow anyone to approve their own pull request, so the sole maintainer's own PRs are merged with the admin bypass the ruleset grants. That is the intended workflow, not a gap. (It was a gap until the `CODEOWNERS` file existed — without it there were no code owners, so the requirement blocked everyone and empowered no one.)
 - **Commit attribution splits at the v2 work.** Earlier commits belong to the older account; later ones to the account that owns the repo. Harmless, but it explains a discontinuity in `git log`.
 - **The 2.0.0 changelog links to a `v1.12.0` tag that does not exist** — upstream's newest tag is `v1.11.0`, and 1.12.0 exists only as an untagged CHANGELOG entry. Cosmetic; self-corrects from the next release.
