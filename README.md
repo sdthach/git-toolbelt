@@ -144,6 +144,10 @@ Short `g`+verb executables — no `git ` prefix needed. Full reference, includin
 
 </details>
 
+## Background
+
+[`docs/distribution-rework.md`](docs/distribution-rework.md) records why v2.0.0 changed how this fork is built, versioned, and shipped — and the silent failures found along the way.
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for release history, including this fork's changes.

@@ -4,6 +4,8 @@ Back to the [README](../README.md).
 
 This is a personal fork of [`nvie/git-toolbelt`](https://github.com/nvie/git-toolbelt) under GitHub user `sdthach` (repo: `github.com/sdthach/git-toolbelt`), extended with the `portmanteaus/` shortcut set, this `docs/` layout, and dual mise/Homebrew distribution that works identically on macOS and Linux/WSL. Everything added here is additive — the upstream `git-*` scripts are left untouched so merges from upstream stay clean.
 
+> The reasoning behind the current setup, and the failures that shaped it, are recorded in [distribution-rework](distribution-rework.md).
+
 ## Layout
 
 ```
