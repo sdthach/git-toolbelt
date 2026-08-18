@@ -1,4 +1,22 @@
-# v1.12.0-fork.1
+# Changelog
+
+## [2.0.0](https://github.com/sdthach/git-toolbelt/compare/v1.12.0...v2.0.0) (2026-08-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* the Homebrew tap is retired. packaging/git-toolbelt.rb, the homebrew-tap bump job, and the TAP_TOKEN secret are removed; releases now need no secrets and no second repository. Existing `brew install sdthach/tap/git-toolbelt` users stay pinned at v1.12.0-fork.1 until they switch to mise.
+
+### Features
+
+* distribute via mise, automate versioning, keep Homebrew ([#7](https://github.com/sdthach/git-toolbelt/issues/7)) ([388601b](https://github.com/sdthach/git-toolbelt/commit/388601bba59d086298c23eb5196012a21b6a8ba3))
+
+
+### Documentation
+
+* rewrite PUBLISHING.md as a release runbook ([#6](https://github.com/sdthach/git-toolbelt/issues/6)) ([8354875](https://github.com/sdthach/git-toolbelt/commit/83548755715b50b651d0b9a1c2b235823a8367b6))
+
+## v1.12.0-fork.1
 
 - New `portmanteaus/` set of `g`+verb shortcut commands for the everyday workflow:
   `getch` (fetch), `gull` (pull), `gulp` (fetch + pull), `gush` (push-current),
@@ -16,45 +34,45 @@
   no longer depends on `rev`, so it works on Git for Windows / Git Bash (which ships no
   `rev`). The last-field extraction now uses portable `awk` (fixes [nvie#29](https://github.com/nvie/git-toolbelt/issues/29))
 
-# v1.12.0
+## v1.12.0
 
 - `git-push-current` now honors and supports a differently-named upstream
   branch when one is set. You can also setup one with `-u <remote-branch>`
 
-# v1.11.0
+## v1.11.0
 
 - New command: `git-edit-author-dates` to interactive rebase to edit author dates
 - Fix: `git-modified` now accepts `-- <pathspec>...` for filtering by path, and
   errors on invalid commit/flag combinations instead of silently ignoring them
 
-# v1.10.0
+## v1.10.0
 
 - Improve `git-main-branch` to auto-detect the main branch name from the remote
   (thanks @theaccountingnerd!)
 - Remove `git-repo` (conflicts with new built-in `git repo` subcommand)
 - Fetch before checking out in `git-workon`
 
-# v1.9.4
+## v1.9.4
 
 - Fix: recognize `production` as a valid main branch
 
-# v1.9.3
+## v1.9.3
 
 - Fix: use main branch in `git-merged` (instead of hardcoding `master`)
 
-# v1.9.2
+## v1.9.2
 
 - `git-shatter-by-file` will still work when there are "skipped" files
 - Various internal shell script improvements
 
-# v1.9.1
+## v1.9.1
 
 - `git-main-branch` will now also recognize `mainline` as a main branch name,
   for users migrating from Perforce.
 - `git-shatter-by-file` will still work when there are "skipped" files
 - Various internal shell script improvements
 
-# v1.9.0
+## v1.9.0
 
 - git-cleave will now prefix commit messages (instead of suffix them) wth the
   path matches it cleaves off
@@ -62,38 +80,38 @@
   path matches
 - git-cleave will now prevent empty commits from being destroyed
 
-# v1.8.4
+## v1.8.4
 
 - Fix issue where the probe for "(g)realpath" can fail
 
-# v1.8.3
+## v1.8.3
 
 - Hide possible warnings displayed by `which` on some platforms
 
-# v1.8.2
+## v1.8.2
 
 - Fix the fix from 1.8.1, which broke some Linux distros.
 
-# v1.8.1
+## v1.8.1
 
 - Fix to be compatible with `coreutils` 9.2+, which renamed `realpath` → `grealpath`
 
-# v1.8.0
+## v1.8.0
 
 - New command: `git-diff-since`
 - New command: `git-sync-commit-date`
 - `git-cleanup` will now only remove branches after explicit `-l` (local) or `-r` (remote) flag
 
-# v1.7.1
+## v1.7.1
 
 - Add `-m` option to `git-modified` to only show locally modified files
 - Fix: make `git-merges-cleanly` work when there are skipped files
 
-# v1.7.0
+## v1.7.0
 
 - New command: `git-cleave` to split a commit by file paths.
 
-# v1.6.0
+## v1.6.0
 
 - New command: `git-wip`. This will create quick save point
   commits for Work In Progress (WIP). This creates quick commits
@@ -106,12 +124,12 @@
   where you can specify the threshold for what is considered "active" (#36,
   thanks @ernstki!)
 
-# v1.5.1
+## v1.5.1
 
 - Fixes an issue where `git-local-branches` could report "HEAD detached at ..."
   message (#44, thanks @asford!)
 
-# v1.5.0
+## v1.5.0
 
 - Add support for repos with a default branch named main (not master)
 - Adds a new script git main-branch
@@ -121,15 +139,15 @@
   - `git-show-assumed`
   - `git-cleanup-squashed`
 
-# v1.4.2
+## v1.4.2
 
 - Support `git-active-branches` on Windows (thanks @ernstki!)
 
-# v1.4.1
+## v1.4.1
 
 - Added LICENSE
 
-# v1.4.0
+## v1.4.0
 
 - New commands:
 
@@ -143,7 +161,7 @@
   - `git-show-assumed` (use `git-show-skipped` now)
   - `git-cleanup-squashed` (use `git cleanup -s` now)
 
-# v1.3.0
+## v1.3.0
 
 - New commands:
   - `git spinoff <new-branch> [<base>]` (inspired by Magit's spinoff command),
@@ -153,13 +171,13 @@
   - `git remote-tracking-branch [<branch>]` will print the name of the remote
     tracking branch of the current or given branch (if any)
 
-# v1.2.4
+## v1.2.4
 
 - Added new utility `git-cleanup-squashed` which can detect and clean up
   branches that have been squashed-merged into master (thank you,
   @jonathanchu)!
 
-# v1.2.3
+## v1.2.3
 
 - New script:
 
@@ -169,29 +187,29 @@
 - Improvement:
   - Make `git-sha` work without further arguments (thanks @RMGiroux!)
 
-# v1.2.2
+## v1.2.2
 
 - Bugfixes:
   - Make `git-fixup` not use `--no-verify` by default and instead respect
     existing pre-commit hooks
 
-# v1.2.1
+## v1.2.1
 
 - Fix: don't verify when fixing up
 - Fix: autostash when rebasing interactively after fixups
 - Fix: docs for `git-workon`
 
-# v1.2.0
+## v1.2.0
 
 - New command: `git-fixup-with`
 - Fixes some bugs in `git-shatter-by-file` that happened when not called from
   the git root
 
-# v1.1.5
+## v1.1.5
 
 - Add `git-separator`
 - Add `git-shatter-by-file`
 
-# v1.1.4 and older
+## v1.1.4 and older
 
 No changelog kept here yet.
