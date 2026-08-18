@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Identify which git-toolbelt is on PATH.
+#
+# Every other command in this toolbelt is deliberately named the same as its
+# upstream counterpart, so the fork stays a drop-in replacement. That leaves no
+# way to tell whose build you have installed — this command is that way.
+# Upstream (nvie/git-toolbelt) ships no `git-toolbelt`, so `git toolbelt`
+# answering at all already means this fork is the one being found.
+set -eu
+
+# Stamped by scripts/build-dist.sh when the release tarball is built. A working
+# tree, or a `brew --HEAD` build, reports "dev" — which is accurate, since
+# neither is a released build.
+VERSION="dev"
+
+usage() {
+    echo "usage: git toolbelt [--version]"
+    echo
+    echo "  (no arguments)   print version, fork identity, and project URL"
+    echo "  -v, --version    print the bare version, for scripts"
+}
+
+case "${1:-}" in
+    "")
+        echo "git-toolbelt $VERSION"
+        echo "sdthach fork of nvie/git-toolbelt"
+        echo "https://github.com/sdthach/git-toolbelt"
+        ;;
+    -v | --version)
+        echo "$VERSION"
+        ;;
+    -h | --help)
+        usage
+        ;;
+    *)
+        echo "git-toolbelt: unknown argument '$1'" >&2
+        usage >&2
+        exit 2
+        ;;
+esac

@@ -35,6 +35,10 @@ Back to the [README](../README.md).
 - ⭐️ [git-spinoff](#git-spinoff)
 - ⭐️ [git-wip](#git-wip)
 
+## Fork identity
+
+- [git-toolbelt](#git-toolbelt)
+
 ## Statistics
 
 - [git-committer-info](#git-committer-info)
@@ -284,7 +288,7 @@ Amend all local staged changes into the last commit. Ideal for fixing typo's, wh
 
 ### git fixup-with
 
-Interactively lets you pick a commit to fixup with. (Uses `fzf` for the interactive picking. Use `brew install fzf` to install this tool separately.) Use `-r` to trigger an interactive rebase right afterwards.
+Interactively lets you pick a commit to fixup with. (Uses `fzf` for the interactive picking. Use `mise use -g fzf` to install this tool separately.) Use `-r` to trigger an interactive rebase right afterwards.
 
 ### git workon
 
@@ -511,5 +515,21 @@ $ git sync-commit-date -fq
 ### git wip
 
 Commits all local changes under a commit message of "WIP". Great for quickly creating "savepoint" commits. If there is a mix of staged changes, and unstaged changes, and new files, will commit each of these as a separate commit, all titled "WIP". Effectively, running `git-wip` once will potentially lead to anywhere between 0 and 3 "WIP" commits being created.
+
+### git toolbelt
+
+Prints which git-toolbelt is installed, and is the only command in this toolbelt that upstream does not also ship. Every other command deliberately keeps its upstream name so the fork stays a drop-in replacement, which otherwise leaves no way to tell whose build is on `PATH` — `git toolbelt` answering at all means this fork is the one being found.
+
+The version is stamped into the script when the release tarball is built. A working-tree checkout or a `brew --HEAD` build reports `dev`, which is accurate: neither is a released build.
+
+```console
+$ git toolbelt
+git-toolbelt 2.0.0
+sdthach fork of nvie/git-toolbelt
+https://github.com/sdthach/git-toolbelt
+
+$ git toolbelt --version    # bare version, for scripts
+2.0.0
+```
 
 [gitlog]: https://git-scm.com/book/en/v2/Git-Basics-Viewing-the-Commit-History#_limiting_log_output

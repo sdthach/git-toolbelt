@@ -1,0 +1,2 @@
+# Build output from scripts/build-dist.sh / `mise run build`.
+/dist/
