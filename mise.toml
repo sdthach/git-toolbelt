@@ -14,8 +14,8 @@ yamllint = "latest"
 # Put both directories on PATH so the commands resolve while you edit them.
 _.path = [".", "portmanteaus"]
 
-[tasks.lint]
-description = "shellcheck everything, at the same severities CI uses"
+[tasks."lint:sh"]
+description = "shellcheck, at the same severities CI uses"
 run = [
   # The fork's own scripts are held to shellcheck's full default severity.
   "shellcheck -s sh portmanteaus/* scripts/*.sh git-toolbelt",
@@ -24,9 +24,15 @@ run = [
   # findings. Lint them at error severity to catch genuine bugs from a future
   # upstream merge without failing on inherited style noise.
   "shellcheck --severity=error git-*",
-  # .yamllint tunes this for GitHub Actions workflows.
-  "yamllint .github .yamllint",
 ]
+
+[tasks."lint:yaml"]
+description = "yamllint the workflows (.yamllint tunes it for GitHub Actions)"
+run = "yamllint .github .yamllint"
+
+[tasks.lint]
+description = "Every linter"
+depends = ["lint:sh", "lint:yaml"]
 
 [tasks.setup]
 description = "One-time clone setup: upstream remote (fetch-only) + gh default repo"
