@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.1](https://github.com/sdthach/git-toolbelt/compare/v2.0.0...v2.0.1) (2026-08-18)
+
+
+### Documentation
+
+* fix the signing runbook and expand TAP_TOKEN setup ([#9](https://github.com/sdthach/git-toolbelt/issues/9)) ([be6741a](https://github.com/sdthach/git-toolbelt/commit/be6741a646b2cf0794ef15678085c17ba375e311))
+* record the v2.0.0 distribution rework ([#11](https://github.com/sdthach/git-toolbelt/issues/11)) ([a9a81ac](https://github.com/sdthach/git-toolbelt/commit/a9a81ac3cc2b761ab86b2f451a576da94b8b19fa))
+
 ## [2.0.0](https://github.com/sdthach/git-toolbelt/compare/v1.12.0...v2.0.0) (2026-08-18)
 
 
