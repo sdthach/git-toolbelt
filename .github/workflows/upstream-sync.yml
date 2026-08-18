@@ -24,6 +24,10 @@ jobs:
       - name: Open a sync PR from upstream/main
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # This repo is a fork, and gh resolves a fork's base repo to its
+          # PARENT — without this, `gh pr create` below targets
+          # nvie/git-toolbelt instead of us and fails.
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           git remote add upstream https://github.com/nvie/git-toolbelt.git

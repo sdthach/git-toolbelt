@@ -74,6 +74,8 @@ jobs:
       - name: Attach assets to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # As above: pin gh to this repo rather than the fork's parent.
+          GH_REPO: ${{ github.repository }}
         run: gh release upload "$TAG" dist/* --clobber
 
       # The tap copy is replaced wholesale from packaging/git-toolbelt.rb rather
