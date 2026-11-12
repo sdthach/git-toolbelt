@@ -134,4 +134,7 @@ fi
 
 [ "$fail" -eq 0 ] || exit 1
 "$root/scripts/test-bare-worktree.sh"
+# git-modified, as shipped, against upstream's version before the quoting fix
+# (a temporary divergence, see docs/maintaining-the-fork.md).
+TOOLBELT_TEST_BIN=$bin "$root/scripts/test-git-modified.sh"
 echo "smoke test passed"

@@ -114,45 +114,94 @@ fi
 # !           !    ignored
 # -------------------------------------------------
 
+# With -z, git separates paths with NUL bytes and never quotes them. Without
+# it, git puts a path that contains a space, a double quote, a backslash or a
+# control character in C-style quotes, and shows a rename as "old -> new",
+# neither of which can be undone reliably in sh.
 status () {
     if [ $# -gt 0 ]; then
-        git -c core.quotePath=false status --porcelain -- "$@" | grep -vEe '^.D' | grep -vEe '^D '
+        git status --porcelain -z -- "$@" | nul_to_lines
     else
-        git -c core.quotePath=false status --porcelain | grep -vEe '^.D' | grep -vEe '^D '
+        git status --porcelain -z | nul_to_lines
     fi
 }
 
-fix_rename_notation () {
-    sed -Ee 's/.* -> (.*)/\1/'
+# Turns NUL-terminated records into lines. A newline inside a name becomes a
+# \001 byte first, so every line is exactly one record, and a name with a
+# newline in it cannot be mistaken for the start of another record.
+nul_to_lines () {
+    tr '\n\0' '\001\n'
+}
+
+soh="$(printf '\001')"
+
+# Reads `git status --porcelain -z` records, one per line, and prints the path
+# of each one the flags select.
+select_paths () {
+    source_next=0
+    while IFS= read -r record; do
+        if [ $source_next -eq 1 ]; then
+            # The original path of a rename or copy: only the new path is listed
+            source_next=0
+            continue
+        fi
+        xy="${record%"${record#??}"}"
+        case "$xy" in
+            [RC]?|?[RC]) source_next=1;;
+        esac
+        # Deleted files don't exist, so they are never listed
+        case "$xy" in
+            ?D|"D ") continue;;
+        esac
+        if [ $unmerged -eq 1 ]; then
+            case "$xy" in
+                U?|?U|AA) ;;
+                *) continue;;
+            esac
+        elif [ $index -eq 1 ]; then
+            :
+        elif [ $modified -eq 1 ]; then
+            case "$xy" in
+                ?M) ;;
+                *) continue;;
+            esac
+        else
+            # Changed in the work tree, or untracked
+            case "$xy" in
+                ?" ") continue;;
+            esac
+        fi
+        printf '%s\n' "${record#???}"
+    done
+}
+
+# Names with a newline cannot be printed one per line, so they are left out.
+skip_newline_names () {
+    while IFS= read -r f; do
+        case "$f" in
+            *"$soh"*)
+                if [ $quiet -eq 0 ]; then
+                    echo "git modified: skipping a filename that contains a newline" >&2
+                fi
+                ;;
+            *)
+                printf '%s\n' "$f"
+                ;;
+        esac
+    done
 }
 
 make_relative () {
-    while read -r f; do
+    while IFS= read -r f; do
         git relative-path "$f"
     done
 }
 
-modified_in_index () {
-    status "$@" | cut -c 4- | fix_rename_notation | make_relative
-}
-
-modified_unmerged () {
-    status "$@" | grep -Ee '^(U.|.U)' | cut -c 4- | fix_rename_notation | make_relative
-}
-
-modified_only_locally () {
-    status "$@" | cut -c 2- | grep -Ee '^M' | cut -c 3- | fix_rename_notation | make_relative
-}
-
-modified_locally () {
-    status "$@" | cut -c 2- | grep -vEe '^[ ]' | cut -c 3- | fix_rename_notation | make_relative
-}
-
 fail_if_empty () {
     empty=1
-    while read -r line; do
+    while IFS= read -r line; do
         if [ $quiet -eq 0 ]; then
-            echo "$line"
+            printf '%s\n' "$line"
         fi
         empty=0
     done
@@ -160,21 +209,13 @@ fail_if_empty () {
 }
 
 if [ -z "$commit" ]; then
-    if [ $unmerged -eq 1 ]; then
-        modified_unmerged "$@" | fail_if_empty
-    elif [ $index -eq 1 ]; then
-        modified_in_index "$@" | fail_if_empty
-    elif [ $modified -eq 1 ]; then
-        modified_only_locally "$@" | fail_if_empty
-    else
-        modified_locally "$@" | fail_if_empty
-    fi
+    status "$@" | select_paths | skip_newline_names | make_relative | fail_if_empty
 else
     # --root so the initial commit lists its files, -M so a rename yields only
     # the destination path.
-    git -c core.quotePath=false diff-tree -r -M --root --no-commit-id --name-only "$commit" -- "$@" | make_relative | while read -r f; do
+    git diff-tree -z -r -M --root --no-commit-id --name-only "$commit" -- "$@" | nul_to_lines | skip_newline_names | make_relative | while IFS= read -r f; do
         if [ -f "$f" ]; then
-            echo "$f"
+            printf '%s\n' "$f"
         fi
     done | fail_if_empty
 fi

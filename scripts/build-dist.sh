@@ -8,7 +8,8 @@
 # The version defaults to version.txt, which release-please keeps current.
 #
 # The repo keeps the upstream `git-*` scripts at its root (byte-identical to
-# nvie/git-toolbelt, so upstream-sync merges stay clean), the fork's shortcuts
+# nvie/git-toolbelt apart from the temporary patches listed in
+# docs/maintaining-the-fork.md, so upstream-sync merges stay clean), the fork's shortcuts
 # in portmanteaus/, and the fork's bare-repo + worktree commands (with their
 # docs and config samples) in bare-worktree/. None of those layouts is what we
 # want to ship, so the tarball is assembled here instead:
