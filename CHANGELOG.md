@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.0](https://github.com/sdthach/git-toolbelt/compare/v2.0.1...v2.1.0) (2026-11-12)
+
+
+### Features
+
+* **bare-worktree:** add git commands for the Worktrunk bare-worktree layout ([#22](https://github.com/sdthach/git-toolbelt/issues/22)) ([e4d0119](https://github.com/sdthach/git-toolbelt/commit/e4d011972c5544987d62559b8d9d8a531161ebd6))
+* sync upstream nvie/git-toolbelt to 354262e (17 commits) ([#23](https://github.com/sdthach/git-toolbelt/issues/23)) ([20a60d9](https://github.com/sdthach/git-toolbelt/commit/20a60d9f8a8614cae87f85ebf72b5beb02ccebd9))
+
 ## [2.0.1](https://github.com/sdthach/git-toolbelt/compare/v2.0.0...v2.0.1) (2026-08-18)
 
 
