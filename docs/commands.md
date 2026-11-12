@@ -129,13 +129,13 @@ Returns a list of locally modified files. In contrast to git status, it does not
 This makes it ideal for the following use-case:
 
 ```console
-$ vim $(git modified)
+$ vim -- $(git modified)
 ```
 
 If you want to locally modified files that are already staged, too, use:
 
 ```console
-$ vim $(git modified -i)
+$ vim -- $(git modified -i)
 ```
 
 To restrict the result to one or more paths, pass pathspecs after `--`:
@@ -160,7 +160,7 @@ Like git-modified, but for printing a list of files that have been modified sinc
 Opens all files modified on your branch (since you branched off `main`).
 
 ```console
-$ vim $(git modified-since)
+$ vim -- $(git modified-since)
 ```
 
 ### git separator

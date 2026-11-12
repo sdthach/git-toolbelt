@@ -2,7 +2,7 @@
 
 Back to the [README](../README.md).
 
-This is a personal fork of [`nvie/git-toolbelt`](https://github.com/nvie/git-toolbelt) under GitHub user `sdthach` (repo: `github.com/sdthach/git-toolbelt`), extended with the `portmanteaus/` shortcut set, the `bare-worktree/` bare-repo + worktree commands, this `docs/` layout, and dual mise/Homebrew distribution that works identically on macOS and Linux/WSL. Everything added here is additive — the upstream `git-*` scripts are left untouched so merges from upstream stay clean.
+This is a personal fork of [`nvie/git-toolbelt`](https://github.com/nvie/git-toolbelt) under GitHub user `sdthach` (repo: `github.com/sdthach/git-toolbelt`), extended with the `portmanteaus/` shortcut set, the `bare-worktree/` bare-repo + worktree commands, this `docs/` layout, and dual mise/Homebrew distribution that works identically on macOS and Linux/WSL. Everything added here is additive — the upstream `git-*` scripts are kept as upstream has them so merges from upstream stay clean, apart from fixes on their way upstream, listed under [Temporary divergences from upstream](#temporary-divergences-from-upstream).
 
 > The reasoning behind the current setup, and the failures that shaped it, are recorded in [distribution-rework](distribution-rework.md).
 
@@ -10,7 +10,7 @@ This is a personal fork of [`nvie/git-toolbelt`](https://github.com/nvie/git-too
 
 ```
 git-toolbelt/                 # fork: github.com/sdthach/git-toolbelt
-├── git-*  (60 upstream)      # UNTOUCHED, at the root, on purpose
+├── git-*  (60 upstream)      # as upstream has them, at the root, on purpose
 ├── git-toolbelt              # fork-only: identifies which build is installed
 ├── portmanteaus/             # getch gull gulp gush gadd gommit gamend
 │   └── gatus giff glog granch gtash gout gome
@@ -20,7 +20,8 @@ git-toolbelt/                 # fork: github.com/sdthach/git-toolbelt
 ├── scripts/
 │   ├── build-dist.sh         # assembles the release tarball
 │   ├── smoke-test.sh         # builds it and exercises it like an install
-│   └── test-bare-worktree.sh # end-to-end tests for bare-worktree/ (run by smoke)
+│   ├── test-bare-worktree.sh # end-to-end tests for bare-worktree/ (run by smoke)
+│   └── test-git-modified.sh  # git-modified against upstream's 354262e (run by smoke)
 ├── packaging/git-toolbelt.rb # brew formula source of truth
 ├── .github/workflows/        # ci / upstream-sync / release
 ├── mise.toml                 # dev PATH + tools + lint/build/smoke/ci tasks
@@ -118,9 +119,9 @@ Commits that GitHub itself creates — squash merges, and release-please's chang
 Three workflows live in `.github/workflows/`:
 
 - **`ci.yml`** — on every push/PR. Three jobs, each running one mise task, so a failure names itself in the checks list. They are the same tasks `mise run ci` runs locally, so CI and local can't drift:
-  - `shellcheck` — full severity for the fork's own scripts (`portmanteaus/*`, `bare-worktree/git-*`, `scripts/*.sh`, `git-toolbelt`), `--severity=error` for the untouched upstream `git-*` scripts, which carry pre-existing style/info/warning findings we deliberately don't "fix" so upstream merges stay clean.
+  - `shellcheck` — full severity for the fork's own scripts (`portmanteaus/*`, `bare-worktree/git-*`, `scripts/*.sh`, `git-toolbelt`), `--severity=error` for the upstream `git-*` scripts, which carry pre-existing style/info/warning findings we deliberately don't "fix" so upstream merges stay clean.
   - `yamllint` — the workflows, tuned by `.yamllint`.
-  - `smoke` — builds the release tarball, extracts it, and runs commands off its `bin/`, checking the archive shape (including the `share/git-toolbelt/bare-worktree/` docs and samples) and that every shipped command is executable, then runs `scripts/test-bare-worktree.sh`. This is what stops a broken release reaching users.
+  - `smoke` — builds the release tarball, extracts it, and runs commands off its `bin/`, checking the archive shape (including the `share/git-toolbelt/bare-worktree/` docs and samples) and that every shipped command is executable, then runs `scripts/test-bare-worktree.sh` and `scripts/test-git-modified.sh`. The latter compares `git-modified` with upstream's version from this repository's history, so the job checks out with `fetch-depth: 0`. This is what stops a broken release reaching users.
 
   > **Job names are load-bearing.** Branch protection on `main` requires the status check named `shellcheck`. A required check that never reports is never satisfied, so renaming that job silently blocks every future PR — including release-please's release PR. Update the branch protection rule before renaming.
 
@@ -152,9 +153,17 @@ $ git push -u origin HEAD                # open a PR, squash-merge it, close the
 
 Use `fix:` if the sync is fixes only, and `feat!:` if upstream removed or renamed commands. When resolving: take upstream's version of any root `git-*` script, keep the fork's `README.md` (it is the fork's index; port upstream's command-doc changes into [`docs/commands.md`](commands.md)), and update the command counts in `README.md`, `docs/install.md`, `packaging/git-toolbelt.rb` and the layout tree above.
 
-Because the upstream `git-*` scripts are never modified — and never moved — in this fork, these merges stay conflict-free in the common case. Conflicts come from fork-only files that upstream also touches (`README.md`, `.envrc`), or from a root script the fork changed anyway (`git-modified` once did, and that change was dropped for upstream's fix in the 2026-11 sync).
+Because the upstream `git-*` scripts are not modified in this fork, apart from the [temporary divergences](#temporary-divergences-from-upstream) below, and never moved, these merges stay conflict-free in the common case. Conflicts come from fork-only files that upstream also touches (`README.md`, `.envrc`), or from a root script the fork changed anyway (`git-modified` did before the 2026-11 sync, which dropped that change for upstream's fix, and does again now).
 
 If upstream adds a new `git-*` command, it needs no packaging work: `build-dist.sh` globs `git-*`, so it ships automatically. It does deserve an entry in [`docs/commands.md`](commands.md) and the README index.
+
+## Temporary divergences from upstream
+
+A root `git-*` script is changed here only to carry a fix that has been offered upstream, and only until upstream has it. Each one is listed here, so the sync that brings in upstream's fix knows to drop it.
+
+- **`git-modified`.** Filenames that git quotes (a space, a backslash, a double quote, a tab or ` -> ` in the name) were printed with git's quotes and escapes, or silently dropped with `<commit>`; a name with a newline could garble the entries after it; and `-u` missed add/add (`AA`) conflicts. The fork carries the two commits from the `upstream-fix/git-modified-paths` branch, which is based on upstream's `354262e` and holds nothing but `git-modified` and upstream's `CHANGELOG.md`: "Handle filenames that git quotes in `git-modified`" and "Include add/add conflicts in `git modified -u`". [`scripts/test-git-modified.sh`](../scripts/test-git-modified.sh) checks the result against upstream's `354262e` version.
+
+  Drop it at the first sync after upstream has the fix: take upstream's `git-modified` and `CHANGELOG.md` lines, even where upstream's version differs from the fork's, delete this entry, and bring `scripts/test-git-modified.sh` in line with upstream's behaviour where it differs. Until then, a sync that touches `git-modified` conflicts on it; keep the fork's version, with upstream's other changes merged in.
 
 ## Versioning and releases
 
