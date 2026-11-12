@@ -9,9 +9,12 @@ if [ ! -x "$realpath_bin" ]; then
     exit 1
 fi
 
-if ! "$realpath_bin" --version 2>/dev/null | grep -q GNU; then
-    echo "I expected the 'realpath' utility to be the GNU version." >&2
-    echo "$realpath_bin: not the GNU version" >&2
+# Probe for the one feature this script needs instead of checking for the GNU
+# version: BSD realpath lacks --relative-to, while GNU and uutils coreutils
+# (the default on recent Ubuntu) both support it.
+if [ "$("$realpath_bin" --relative-to=. . 2>/dev/null)" != "." ]; then
+    echo "I expected a 'realpath' utility that supports --relative-to." >&2
+    echo "$realpath_bin: does not support --relative-to" >&2
     echo "Please install GNU coreutils and try again." >&2
     exit 2
 fi

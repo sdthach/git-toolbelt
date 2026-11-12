@@ -71,6 +71,8 @@
 - Asking for help is no longer an error: `-h` now prints to stdout and exits 0,
   so `git <cmd> -h | less` works without redirecting stderr (thanks @ernstki!)
 - Various security fixes
+- Fix: `git-relative-path` (and so `git-modified`) accepts any `realpath` that
+  supports `--relative-to`, such as uutils coreutils, instead of requiring GNU
 
 ## v1.11.0
 
