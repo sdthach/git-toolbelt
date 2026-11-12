@@ -3,6 +3,13 @@ name: upstream-sync
 # Pull fixes/features from upstream nvie/git-toolbelt into this fork's main by
 # opening a PR (never an auto fast-forward — fork-only files like docs/ and the
 # README hub diverge from upstream and a merge may need a human to resolve).
+#
+# main requires linear history and signed commits, and upstream's commits are
+# mostly unsigned, so a sync always lands as one squash commit. That means
+# upstream's commits never become ancestors of main, and
+# `git rev-list origin/main..upstream/main` would count the same commits
+# forever. Instead, .upstream-sync-base records the upstream commit the last
+# sync brought in, and only upstream commits after it count.
 
 on:
   schedule:
@@ -32,34 +39,69 @@ jobs:
           set -euo pipefail
           git remote add upstream https://github.com/nvie/git-toolbelt.git
           git fetch --quiet upstream main
+          tip="$(git rev-parse upstream/main)"
 
-          ahead="$(git rev-list --count origin/main..upstream/main)"
+          # The upstream commit the last sync brought in. Fall back to the
+          # merge base if the file is missing or names an unknown commit.
+          base="$(sed -n '1p' .upstream-sync-base 2>/dev/null || true)"
+          if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            base="$(git merge-base origin/main upstream/main)"
+            echo "No usable .upstream-sync-base; counting from the merge base $base."
+          fi
+
+          ahead="$(git rev-list --count "$base..upstream/main")"
           if [ "$ahead" -eq 0 ]; then
-            echo "main is already up to date with upstream; nothing to sync."
+            echo "main already has upstream up to ${tip}; nothing to sync."
             exit 0
           fi
-          echo "upstream is $ahead commit(s) ahead of main."
+          echo "upstream has $ahead commit(s) after $base."
 
-          branch="upstream-sync/$(date -u +%Y%m%d)"
-          # Reuse today's branch if a prior run already created it.
+          # One sync PR at a time: an open one already carries these commits,
+          # or an older subset of them that its reviewer can refresh.
+          open="$(gh pr list --state open --json headRefName \
+            --jq '[.[] | select(.headRefName | startswith("upstream-sync/"))] | length')"
+          if [ "$open" -gt 0 ]; then
+            echo "A sync PR is already open; not opening another."
+            exit 0
+          fi
+
+          # Named after the upstream tip, so the same tip never opens two PRs.
+          branch="upstream-sync/${tip:0:12}"
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
-            echo "Branch $branch already exists on origin; a sync PR is likely open."
+            echo "Branch $branch already exists on origin; not opening another PR."
             exit 0
           fi
 
-          # Push upstream's tip to a fork branch and open a PR into main so the
-          # diff/conflicts surface in the PR UI for review.
-          git push origin "upstream/main:refs/heads/$branch"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --quiet -c "$branch" origin/main
 
-          # Squash-merge this PR. Upstream's own commit subjects are free-form
-          # and release-please cannot classify them; squashing lands the single
-          # conventional subject below, so the sync produces exactly one
-          # CHANGELOG entry and one version bump.
-          body="Automated weekly sync of upstream/main. Review for conflicts with"
-          body="$body fork-only files (docs, README, portmanteaus, bare-worktree, scripts) first."
-          body="$body\n\n**Squash-merge this PR** so release-please sees one"
-          body="$body classified subject instead of upstream's unclassifiable ones."
-          body="$body Retitle to \`fix:\` if the sync is fixes only."
+          title="feat: sync upstream nvie/git-toolbelt to ${tip:0:7} ($ahead commit(s))"
+          if git merge --squash --quiet upstream/main >/dev/null 2>&1; then
+            # Clean: commit the squashed sync together with the new base.
+            printf '%s\n' "$tip" > .upstream-sync-base
+            git add .upstream-sync-base
+            git commit --quiet -m "$title"
+            git push --quiet origin "$branch"
+            body="Automated weekly sync: upstream/main squashed onto main, plus"
+            body="$body \`.upstream-sync-base\` set to \`$tip\`."
+            body="$body\n\n**Squash-merge this PR** so release-please sees one classified subject."
+            body="$body Retitle to \`fix:\` if the sync is fixes only, or \`feat!:\` if upstream"
+            body="$body removed or renamed commands."
+          else
+            # Conflicts: show upstream's tip for review; the sync itself has
+            # to be done by hand (docs/maintaining-the-fork.md).
+            git reset --quiet --hard origin/main
+            git push --quiet origin "upstream/main:refs/heads/$branch"
+            body="Automated weekly sync. upstream/main does **not** merge cleanly into main,"
+            body="$body so this PR shows upstream's tip for review only. Do not merge it."
+            body="$body\n\nTo sync: branch off main, run \`git merge --squash upstream/main\`,"
+            body="$body resolve the conflicts, write \`$tip\` to \`.upstream-sync-base\`,"
+            body="$body commit (signed), open a PR, squash-merge it, then close this one."
+            body="$body See docs/maintaining-the-fork.md#syncing-from-upstream."
+            title="$title — conflicts, sync by hand"
+          fi
+
           gh pr create --base main --head "$branch" \
-            --title "feat: sync upstream nvie/git-toolbelt ($ahead commit(s))" \
+            --title "$title" \
             --body "$(printf '%b' "$body")"
