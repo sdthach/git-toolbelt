@@ -568,5 +568,7 @@ done
 section_done "names with a newline are skipped with a warning, without desync"
 
 echo "$passes checks passed under:$shells"
+# Which realpath git-relative-path used (GNU or uutils), for CI logs.
+echo "realpath: $(realpath --version 2>/dev/null | head -n 1)"
 [ "$failures" -eq 0 ] || die "$failures check(s) failed"
 echo "git-modified tests passed"

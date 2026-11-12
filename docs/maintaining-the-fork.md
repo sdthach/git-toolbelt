@@ -165,6 +165,10 @@ A root `git-*` script is changed here only to carry a fix that has been offered 
 
   Drop it at the first sync after upstream has the fix: take upstream's `git-modified` and `CHANGELOG.md` lines, even where upstream's version differs from the fork's, delete this entry, and bring `scripts/test-git-modified.sh` in line with upstream's behaviour where it differs. Until then, a sync that touches `git-modified` conflicts on it; keep the fork's version, with upstream's other changes merged in.
 
+- **`git-relative-path`.** It refused any `realpath` whose `--version` doesn't say "GNU", which also rejects uutils coreutils, the default on Ubuntu 26.04. On a stock Ubuntu 26.04, every `git modified` that lists a file failed with "I expected the 'realpath' utility to be the GNU version". The fork carries "Accept any `realpath` with `--relative-to` in `git-relative-path`" from the `upstream-fix/git-relative-path-capability` branch (based on `354262e`), which checks for `--relative-to` instead. That still rejects BSD's `realpath`, which is what the GNU check was for (upstream #56). CI runs on `ubuntu-26.04`, so `scripts/test-git-modified.sh` exercises it there.
+
+  Drop it the same way, at the first sync after upstream has the fix.
+
 ## Versioning and releases
 
 Versions are computed by [release-please](https://github.com/googleapis/release-please) from conventional-commit subjects on `main`, not chosen by hand. It keeps a `chore: release X.Y.Z` PR open with the computed version and CHANGELOG diff; merging that PR tags, releases, and triggers the artifact build. `version.txt` and `CHANGELOG.md` are maintained by it — don't hand-edit them outside its PR.
