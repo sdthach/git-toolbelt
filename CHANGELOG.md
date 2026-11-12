@@ -10,6 +10,8 @@
   contain a space, a backslash, a double quote, a tab or ` -> `. Names that
   contain a newline can't be listed one per line, so they are skipped with a
   warning
+- Fix: `git-modified -u` now also lists files that were added on both sides
+  (add/add conflicts)
 - Fix: `git-commit-to` no longer discards unstaged changes to tracked files
   after moving the commit to the other branch
 - Fix: `git-cherry-pick-to` no longer pops (and drops!) an unrelated stash
