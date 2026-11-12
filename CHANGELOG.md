@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/sdthach/git-toolbelt/compare/v2.1.0...v2.1.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* handle filenames git quotes in git-modified (temporary patch pending upstream) ([#26](https://github.com/sdthach/git-toolbelt/issues/26)) ([4444558](https://github.com/sdthach/git-toolbelt/commit/44445587a105c5bf075682dff1e29e82d0f9bcb1))
+
 ## [2.1.0](https://github.com/sdthach/git-toolbelt/compare/v2.0.1...v2.1.0) (2026-11-12)
 
 
