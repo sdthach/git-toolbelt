@@ -155,7 +155,7 @@ select_paths () {
         esac
         if [ $unmerged -eq 1 ]; then
             case "$xy" in
-                U?|?U) ;;
+                U?|?U|AA) ;;
                 *) continue;;
             esac
         elif [ $index -eq 1 ]; then
