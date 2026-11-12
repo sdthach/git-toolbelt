@@ -8,18 +8,27 @@
 # The version defaults to version.txt, which release-please keeps current.
 #
 # The repo keeps the upstream `git-*` scripts at its root (byte-identical to
-# nvie/git-toolbelt, so upstream-sync merges stay clean) and the fork's
-# shortcuts in portmanteaus/. Neither layout is what we want to ship, so the
-# tarball is assembled here instead:
+# nvie/git-toolbelt, so upstream-sync merges stay clean), the fork's shortcuts
+# in portmanteaus/, and the fork's bare-repo + worktree commands (with their
+# docs and config samples) in bare-worktree/. None of those layouts is what we
+# want to ship, so the tarball is assembled here instead:
 #
-#   bin/          <- git-* and portmanteaus/*, flattened into one PATH dir
+#   bin/                               <- git-*, portmanteaus/* and
+#                                         bare-worktree/git-*, flattened into
+#                                         one PATH dir
 #   docs/
+#   share/git-toolbelt/bare-worktree/  <- README.md, config.toml.example,
+#                                         wt.toml.example, docs/*.md
 #   README.md CHANGELOG.md LICENSE
+#
+# Only bare-worktree/git-* goes into bin/, never bare-worktree/*: the folder
+# also holds docs and samples, which belong under share/. Its docs/plans/ is
+# repo-only history and is not shipped.
 #
 # Why `bin/`: mise's github backend, with no `bin_path` tool option set, uses
 # <install_path>/bin when that directory exists. Shipping `bin/` at the archive
 # root therefore makes `mise use github:sdthach/git-toolbelt` work with zero
-# tool options. Two top-level directories plus files also mean mise's
+# tool options. Several top-level directories plus files also mean mise's
 # auto-`strip_components` heuristic (single root dir, no files) cannot fire.
 #
 # The archive is byte-reproducible for a given commit: entries are sorted, uid/
@@ -55,8 +64,15 @@ trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/bin"
 cp -p git-* "$stage/bin/"
 cp -p portmanteaus/* "$stage/bin/"
+cp -p bare-worktree/git-* "$stage/bin/"
 cp -pR docs "$stage/docs"
 cp -p README.md CHANGELOG.md LICENSE "$stage/"
+
+share="$stage/share/git-toolbelt/bare-worktree"
+mkdir -p "$share/docs"
+cp -p bare-worktree/README.md bare-worktree/config.toml.example \
+    bare-worktree/wt.toml.example "$share/"
+cp -p bare-worktree/docs/*.md "$share/docs/"
 
 # Stamp the version into the shipped copy of git-toolbelt. It can't read
 # version.txt at runtime: under mise's shims $0 is the shim, not the real file,
@@ -91,7 +107,7 @@ tar --format=gnu \
     --sort=name \
     --owner=0 --group=0 --numeric-owner \
     --mtime="@$epoch" \
-    -C "$stage" -cf - bin docs README.md CHANGELOG.md LICENSE \
+    -C "$stage" -cf - bin docs share README.md CHANGELOG.md LICENSE \
     | gzip -9n > "$outdir/$name.tar.gz"
 
 echo "$outdir/$name.tar.gz ($count commands)"

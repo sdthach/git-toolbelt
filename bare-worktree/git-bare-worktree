@@ -1,0 +1,166 @@
+#!/bin/sh
+#
+# git bare-worktree: one entry point for the bare-worktree commands, and the
+# printer for the two Worktrunk config samples.
+#
+#   git bare-worktree clone|convert|init|switch [args...]
+#       runs git-<action>-worktree with the remaining arguments
+#   git bare-worktree config-example [--project]
+#       prints the user (or, with --project, the project) config sample
+#
+# `git bwt` is a short alias for this command. The samples are kept here as
+# heredocs because under mise shims a script can't reliably find files next
+# to it; scripts/test-bare-worktree.sh checks they stay byte-identical to
+# bare-worktree/config.toml.example and bare-worktree/wt.toml.example.
+set -eu
+
+me="git bare-worktree"
+
+usage() {
+    echo "usage: git bare-worktree <clone|convert|init|switch> [args...]"
+    echo "       git bare-worktree config-example [--project]"
+}
+
+user_sample() {
+    cat <<'USER_CONFIG_SAMPLE'
+# Worktrunk USER config sample for the bare-worktree layout (git-toolbelt).
+#
+# This is your personal config. It lives outside every repo, at
+# ~/.config/worktrunk/config.toml (`wt config show` prints the path, and
+# `wt config create` writes a fully commented default file there).
+# Merge the lines you want into that file; don't overwrite it with this one.
+#
+# Print this sample again:          git bare-worktree config-example
+# Print the project config sample:  git bare-worktree config-example --project
+
+# The bare layout: <repo>/.git is a bare repository and every branch is a
+# sibling worktree, <repo>/main, <repo>/feature-auth, ...
+#
+# For a bare repository {{ repo_path }} is the bare directory itself
+# (<repo>/.git), so "{{ repo_path }}/.." is the <repo> folder.
+# `sanitize` turns / and \ into -, so branch feature/auth gets the folder
+# <repo>/feature-auth while the branch keeps its real name.
+worktree-path = "{{ repo_path }}/../{{ branch | sanitize }}"
+
+# Keep zoxide's list in sync with your worktrees (needs zoxide on PATH).
+# post-start  = "zoxide add {{ worktree_path }}"
+# post-remove = "zoxide remove {{ worktree_path }}"
+#
+# User hooks run without an approval prompt. post-* hooks run in the
+# background; find their output with `wt config state logs`.
+
+# Keep every top-level key above this line: a key placed after a [table]
+# header belongs to that table.
+
+# Per-repo overrides. The key is <host>/<owner>/<repo> from the primary remote
+# (inside the repo, `wt config show` prints it as "Identifier: ..."), and `*`
+# matches any run of characters. Single values such as worktree-path replace
+# the global value; hooks and aliases are added after the global ones.
+#
+# A repo that stays an ordinary clone, with worktrees as siblings of it:
+# [projects."github.com/owner/repo"]
+# worktree-path = "{{ repo_path }}/../{{ repo }}.{{ branch | sanitize }}"
+
+# Optional defaults for wt's own commands (shown with their default values).
+#
+# [list]
+# branches = false       # also list branches without a worktree (--branches)
+# remotes = false        # also list remote-only branches (--remotes)
+#
+# [remove]
+# delete-branch = true   # delete the branch when its worktree is removed
+USER_CONFIG_SAMPLE
+}
+
+project_sample() {
+    cat <<'PROJECT_CONFIG_SAMPLE'
+# Worktrunk PROJECT config sample (git-toolbelt bare-worktree).
+#
+# Save it as .config/wt.toml inside a worktree and commit it: it is shared
+# with everyone who works on the repo. In the bare layout wt reads it from the
+# current worktree (from the <repo> folder itself it reads the default
+# branch's copy), and because the file is tracked, every branch carries its
+# own copy.
+#
+# Create it with `wt config create --project`, or start from this sample:
+#   mkdir -p .config && git bare-worktree config-example --project > .config/wt.toml
+#
+# There is no worktree-path here: the layout is a personal choice and lives
+# in your user config (git bare-worktree config-example).
+#
+# Project hooks ask for approval the first time they run, and again whenever
+# they change.
+
+# Hooks. pre-start blocks until done, right after a worktree is created.
+# pre-start = "mise trust"
+
+# Keep every top-level key above this line: a key placed after a [table]
+# header belongs to that table.
+
+# Dev-server URL column in `wt list` (dimmed when the port isn't listening).
+# [list]
+# url = "http://localhost:{{ branch | hash_port }}"
+
+# Extra excludes for `wt step copy-ignored`. Built-in excludes (VCS metadata
+# and tool state) always apply; these add to the ones in your user config.
+# [step.copy-ignored]
+# exclude = [".cache/", ".turbo/"]
+PROJECT_CONFIG_SAMPLE
+}
+
+case "${1:-}" in
+    -h | --help)
+        usage
+        exit 0
+        ;;
+    clone | convert | init | switch)
+        action=$1
+        shift
+        ;;
+    config-example)
+        case "$#:${2:-}" in
+            1:)
+                user_sample
+                ;;
+            2:--project)
+                project_sample
+                ;;
+            *)
+                usage >&2
+                exit 2
+                ;;
+        esac
+        exit 0
+        ;;
+    "")
+        usage >&2
+        exit 2
+        ;;
+    *)
+        echo "$me: unknown action '$1'" >&2
+        usage >&2
+        exit 2
+        ;;
+esac
+
+# Help needs no Worktrunk: the verb prints it (switch passes it to wt).
+case "${1:-}" in
+    -h | --help) wt_needed=0 ;;
+    *) wt_needed=1 ;;
+esac
+
+if [ "$wt_needed" = 1 ] && ! command -v wt >/dev/null 2>&1; then
+    cat >&2 <<EOF
+$me: Worktrunk (wt) is required but was not found on PATH.
+  Install: https://github.com/max-sixty/worktrunk#install
+  Setup:   https://github.com/sdthach/git-toolbelt/blob/main/bare-worktree/docs/getting-started.md#setting-up-worktrunk
+EOF
+    exit 1
+fi
+
+if ! command -v "git-$action-worktree" >/dev/null 2>&1; then
+    echo "$me: git-$action-worktree was not found on PATH; install all six bare-worktree commands together" >&2
+    exit 1
+fi
+
+exec "git-$action-worktree" "$@"

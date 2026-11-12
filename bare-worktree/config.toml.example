@@ -1,0 +1,46 @@
+# Worktrunk USER config sample for the bare-worktree layout (git-toolbelt).
+#
+# This is your personal config. It lives outside every repo, at
+# ~/.config/worktrunk/config.toml (`wt config show` prints the path, and
+# `wt config create` writes a fully commented default file there).
+# Merge the lines you want into that file; don't overwrite it with this one.
+#
+# Print this sample again:          git bare-worktree config-example
+# Print the project config sample:  git bare-worktree config-example --project
+
+# The bare layout: <repo>/.git is a bare repository and every branch is a
+# sibling worktree, <repo>/main, <repo>/feature-auth, ...
+#
+# For a bare repository {{ repo_path }} is the bare directory itself
+# (<repo>/.git), so "{{ repo_path }}/.." is the <repo> folder.
+# `sanitize` turns / and \ into -, so branch feature/auth gets the folder
+# <repo>/feature-auth while the branch keeps its real name.
+worktree-path = "{{ repo_path }}/../{{ branch | sanitize }}"
+
+# Keep zoxide's list in sync with your worktrees (needs zoxide on PATH).
+# post-start  = "zoxide add {{ worktree_path }}"
+# post-remove = "zoxide remove {{ worktree_path }}"
+#
+# User hooks run without an approval prompt. post-* hooks run in the
+# background; find their output with `wt config state logs`.
+
+# Keep every top-level key above this line: a key placed after a [table]
+# header belongs to that table.
+
+# Per-repo overrides. The key is <host>/<owner>/<repo> from the primary remote
+# (inside the repo, `wt config show` prints it as "Identifier: ..."), and `*`
+# matches any run of characters. Single values such as worktree-path replace
+# the global value; hooks and aliases are added after the global ones.
+#
+# A repo that stays an ordinary clone, with worktrees as siblings of it:
+# [projects."github.com/owner/repo"]
+# worktree-path = "{{ repo_path }}/../{{ repo }}.{{ branch | sanitize }}"
+
+# Optional defaults for wt's own commands (shown with their default values).
+#
+# [list]
+# branches = false       # also list branches without a worktree (--branches)
+# remotes = false        # also list remote-only branches (--remotes)
+#
+# [remove]
+# delete-branch = true   # delete the branch when its worktree is removed

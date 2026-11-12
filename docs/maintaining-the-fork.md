@@ -2,7 +2,7 @@
 
 Back to the [README](../README.md).
 
-This is a personal fork of [`nvie/git-toolbelt`](https://github.com/nvie/git-toolbelt) under GitHub user `sdthach` (repo: `github.com/sdthach/git-toolbelt`), extended with the `portmanteaus/` shortcut set, this `docs/` layout, and dual mise/Homebrew distribution that works identically on macOS and Linux/WSL. Everything added here is additive — the upstream `git-*` scripts are left untouched so merges from upstream stay clean.
+This is a personal fork of [`nvie/git-toolbelt`](https://github.com/nvie/git-toolbelt) under GitHub user `sdthach` (repo: `github.com/sdthach/git-toolbelt`), extended with the `portmanteaus/` shortcut set, the `bare-worktree/` bare-repo + worktree commands, this `docs/` layout, and dual mise/Homebrew distribution that works identically on macOS and Linux/WSL. Everything added here is additive — the upstream `git-*` scripts are left untouched so merges from upstream stay clean.
 
 > The reasoning behind the current setup, and the failures that shaped it, are recorded in [distribution-rework](distribution-rework.md).
 
@@ -14,10 +14,13 @@ git-toolbelt/                 # fork: github.com/sdthach/git-toolbelt
 ├── git-toolbelt              # fork-only: identifies which build is installed
 ├── portmanteaus/             # getch gull gulp gush gadd gommit gamend
 │   └── gatus giff glog granch gtash gout gome
+├── bare-worktree/            # fork-only: git-{clone,init,convert,switch}-worktree,
+│                             #   git-bare-worktree, git-bwt + README, docs/, *.example
 ├── docs/                     # install / commands / portmanteaus / maintaining-the-fork
 ├── scripts/
 │   ├── build-dist.sh         # assembles the release tarball
-│   └── smoke-test.sh         # builds it and exercises it like an install
+│   ├── smoke-test.sh         # builds it and exercises it like an install
+│   └── test-bare-worktree.sh # end-to-end tests for bare-worktree/ (run by smoke)
 ├── packaging/git-toolbelt.rb # brew formula source of truth
 ├── .github/workflows/        # ci / upstream-sync / release
 ├── mise.toml                 # dev PATH + tools + lint/build/smoke/ci tasks
@@ -39,10 +42,12 @@ They are deliberately different:
 |---|---|---|
 | upstream commands | `git-cleanup`, … at the root | `bin/git-cleanup`, … |
 | fork shortcuts | `portmanteaus/gadd`, … | `bin/gadd`, … |
+| bare-worktree commands | `bare-worktree/git-clone-worktree`, … | `bin/git-clone-worktree`, … |
+| bare-worktree docs and samples | `bare-worktree/README.md`, `bare-worktree/docs/*.md`, `bare-worktree/*.example` | `share/git-toolbelt/bare-worktree/…` |
 
 Keeping `git-*` at the root is what makes the weekly upstream sync a no-op merge — upstream touches `git-cleanup`, this fork has `git-cleanup` at the same path, and git has nothing to reconcile. Moving them into `bin/` would make every upstream merge depend on rename detection.
 
-The flattening happens instead in [`scripts/build-dist.sh`](../scripts/build-dist.sh) at release time, so the shipped archive gets the single `bin/` directory that installers want without the repo paying for it.
+The flattening happens instead in [`scripts/build-dist.sh`](../scripts/build-dist.sh) at release time, so the shipped archive gets the single `bin/` directory that installers want without the repo paying for it. Only `bare-worktree/git-*` goes into `bin/`; the folder's README, `docs/*.md` and `.example` files go to `share/git-toolbelt/bare-worktree/`, and its `docs/plans/` is repo-only and not shipped.
 
 ## How the two install paths work
 
@@ -53,14 +58,14 @@ mise and Homebrew install the **same artifact**: the `git-toolbelt-<version>.tar
 `mise use -g github:sdthach/git-toolbelt` works with **zero tool options**, and three details in the release are what make that true. All three are asserted by CI, so they can't quietly regress:
 
 1. **There is a release asset at all.** mise's github backend downloads release *assets*; GitHub's auto-generated "Source code (tar.gz)" links are not assets and are invisible to it. A tag alone is not an installable release.
-2. **The archive has a top-level `bin/`.** With no `bin_path` option set, mise's binary-path lookup uses `<install_path>/bin` when that directory exists. The tarball also carries files and a second directory at its root, so mise's automatic `strip_components` heuristic (which fires only for a single root directory with no files) can't move things around.
+2. **The archive has a top-level `bin/`.** With no `bin_path` option set, mise's binary-path lookup uses `<install_path>/bin` when that directory exists. The tarball also carries files and more directories (`docs/`, `share/`) at its root, so mise's automatic `strip_components` heuristic (which fires only for a single root directory with no files) can't move things around.
 3. **The asset is named `git-toolbelt-<version>.tar.gz`.** mise scores assets for platform fit and discards anything scoring ≤ 0. This name scores +10 as a recognized archive format and +20 for matching the repo name, with no OS or architecture token to mismatch against — so the one platform-independent build is selected on every OS and arch.
 
 A `git-toolbelt-<version>.tar.gz.sha256` asset rides along: mise looks for exactly that name and verifies the download against it. Its `.sha256` extension is heavily penalized in asset scoring, so it can never be mistaken for the tool itself. Releases also carry GitHub build-provenance attestations, which mise verifies when present; `github_attestations = false` on the tool is the escape hatch if that service ever blocks an install.
 
 ### Homebrew
 
-The formula's `url` points at that same release asset, so `def install` is just `bin.install Dir["bin/*"]`. A `--HEAD` build gets the repo layout instead of the tarball, so the formula falls back to installing `git-*` and `portmanteaus/*` separately when there's no `bin/` — that branch is what keeps `--HEAD` working.
+The formula's `url` points at that same release asset, so `def install` is just `bin.install Dir["bin/*"]` plus `pkgshare.install "share/git-toolbelt/bare-worktree"` for the bare-worktree docs and samples. A `--HEAD` build gets the repo layout instead of the tarball, so the formula falls back to installing `git-*`, `portmanteaus/*` and `bare-worktree/git-*` separately when there's no `bin/`, and copies the bare-worktree README, samples and `docs/*.md` into `pkgshare` itself — that branch is what keeps `--HEAD` working. Worktrunk is not a `depends_on`: only the bare-worktree commands need it, so the formula's `caveats` say how to install it instead.
 
 [`packaging/git-toolbelt.rb`](../packaging/git-toolbelt.rb) is the source of truth. On each release the workflow copies it over the tap's copy wholesale and rewrites only `url` and `sha256`, so formula edits (dependencies, the `test do` block) propagate. Earlier this was a patch-in-place, and the tap accumulated two commits — a test-block fix and a version pin — that never made it back here; the copy-wholesale approach is what prevents that recurring.
 
@@ -113,9 +118,9 @@ Commits that GitHub itself creates — squash merges, and release-please's chang
 Three workflows live in `.github/workflows/`:
 
 - **`ci.yml`** — on every push/PR. Three jobs, each running one mise task, so a failure names itself in the checks list. They are the same tasks `mise run ci` runs locally, so CI and local can't drift:
-  - `shellcheck` — full severity for the fork's own scripts (`portmanteaus/*`, `scripts/*.sh`, `git-toolbelt`), `--severity=error` for the untouched upstream `git-*` scripts, which carry pre-existing style/info/warning findings we deliberately don't "fix" so upstream merges stay clean.
+  - `shellcheck` — full severity for the fork's own scripts (`portmanteaus/*`, `bare-worktree/git-*`, `scripts/*.sh`, `git-toolbelt`), `--severity=error` for the untouched upstream `git-*` scripts, which carry pre-existing style/info/warning findings we deliberately don't "fix" so upstream merges stay clean.
   - `yamllint` — the workflows, tuned by `.yamllint`.
-  - `smoke` — builds the release tarball, extracts it, and runs commands off its `bin/`, checking the archive shape and that every shipped command is executable. This is what stops a broken release reaching users.
+  - `smoke` — builds the release tarball, extracts it, and runs commands off its `bin/`, checking the archive shape (including the `share/git-toolbelt/bare-worktree/` docs and samples) and that every shipped command is executable, then runs `scripts/test-bare-worktree.sh`. This is what stops a broken release reaching users.
 
   > **Job names are load-bearing.** Branch protection on `main` requires the status check named `shellcheck`. A required check that never reports is never satisfied, so renaming that job silently blocks every future PR — including release-please's release PR. Update the branch protection rule before renaming.
 
@@ -141,7 +146,7 @@ $ git merge upstream/main
 $ git push origin main
 ```
 
-Because the upstream `git-*` scripts are never modified — and never moved — in this fork, these merges stay fast-forward or conflict-free in the common case. Conflicts would only arise if a fork-only file (docs, portmanteaus, scripts) happens to collide with an upstream rename, which is unlikely given the additive-only approach.
+Because the upstream `git-*` scripts are never modified — and never moved — in this fork, these merges stay fast-forward or conflict-free in the common case. Conflicts would only arise if a fork-only file (docs, portmanteaus, bare-worktree, scripts) happens to collide with an upstream rename, which is unlikely given the additive-only approach.
 
 If upstream adds a new `git-*` command, it needs no packaging work: `build-dist.sh` globs `git-*`, so it ships automatically. It does deserve an entry in [`docs/commands.md`](commands.md) and the README index.
 

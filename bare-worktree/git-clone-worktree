@@ -1,0 +1,162 @@
+#!/bin/sh
+#
+# git clone-worktree: clone a remote into the bare-worktree layout.
+#
+#   <directory>/.git      a bare clone, with the normal fetch refspec
+#   <directory>/<branch>  a worktree for the remote's default branch
+#
+# The folder name is the branch with / and \ replaced by - (the same as
+# Worktrunk's `{{ branch | sanitize }}`); the branch keeps its real name.
+# Like `git clone`, this doesn't change your shell's directory: it prints the
+# checkout path and how to get there.
+set -eu
+
+me="git clone-worktree"
+
+# `git --git-dir=... <verb>` exports GIT_DIR and friends to the subcommand, and
+# a shell may have them exported. They would point every git call below at
+# the wrong repository, so they are cleared. -c settings stay.
+unset GIT_DIR GIT_WORK_TREE GIT_IMPLICIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE \
+    GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG GIT_GRAFT_FILE \
+    GIT_NO_REPLACE_OBJECTS GIT_REPLACE_REF_BASE GIT_PREFIX GIT_SHALLOW_FILE GIT_NAMESPACE
+
+usage() {
+    echo "usage: git clone-worktree <repository> [directory]"
+}
+
+case "${1:-}" in
+    -h | --help)
+        usage
+        exit 0
+        ;;
+    "" | -*)
+        usage >&2
+        exit 2
+        ;;
+esac
+
+if [ "$#" -gt 2 ]; then
+    usage >&2
+    exit 2
+fi
+
+if ! command -v wt >/dev/null 2>&1; then
+    cat >&2 <<EOF
+$me: Worktrunk (wt) is required but was not found on PATH.
+  Install: https://github.com/max-sixty/worktrunk#install
+  Setup:   https://github.com/sdthach/git-toolbelt/blob/main/bare-worktree/docs/getting-started.md#setting-up-worktrunk
+EOF
+    exit 1
+fi
+
+warn() {
+    printf '%s: warning: %s\n' "$me" "$*" >&2
+}
+
+# Quote a word for copy-pasting into a shell, only when it needs it.
+quote() {
+    case $1 in
+        "" | *[!A-Za-z0-9_./:@%+=,-]*)
+            printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+            ;;
+        *) printf '%s' "$1" ;;
+    esac
+}
+
+# Shared tail of clone, init and convert: let Worktrunk see the new worktree,
+# register it with zoxide, and print where it is.
+finish() {
+    container=$1
+    branch=$2
+    checkout=$3
+    if wt -C "$container" switch "$branch" --no-cd --no-hooks; then
+        :
+    else
+        warn "'wt switch' failed (exit $?); the checkout is ready, but Worktrunk did not confirm it"
+    fi
+    has_zoxide=0
+    if command -v zoxide >/dev/null 2>&1; then
+        has_zoxide=1
+        if zoxide add "$checkout"; then
+            :
+        else
+            warn "'zoxide add' failed (exit $?); the checkout is ready, but zoxide does not know it yet"
+        fi
+    fi
+    printf '\nCheckout: %s\n' "$checkout"
+    printf 'Next:     cd %s   # or: wt -C %s switch %s' \
+        "$(quote "$checkout")" "$(quote "$container")" "$(quote "$branch")"
+    if [ "$has_zoxide" = 1 ]; then
+        printf '   |   z %s %s' "$(quote "${container##*/}")" "$(quote "${checkout##*/}")"
+    fi
+    printf '\n'
+}
+
+# The directory name, guessed the way `git clone` does: trailing slashes and
+# a trailing /.git go first, then the last path (or host:path) component,
+# then a .git suffix.
+repository=$1
+name=$repository
+while [ "$name" != "${name%/}" ]; do
+    name=${name%/}
+done
+name=${name%/.git}
+while [ "$name" != "${name%/}" ]; do
+    name=${name%/}
+done
+name=${name##*/}
+name=${name##*:}
+name=${name%.git}
+destination=${2-"$name"}
+
+case "$destination" in
+    "" | -* | . | ..)
+        echo "$me: invalid destination '$destination'" >&2
+        exit 2
+        ;;
+esac
+
+if [ -e "$destination" ] || [ -L "$destination" ]; then
+    echo "$me: destination '$destination' already exists" >&2
+    exit 1
+fi
+
+# Everything under <directory> is ours from here on: if a step fails before
+# the worktree exists, remove it, so a retry doesn't stop at "already exists".
+# Missing parent folders are created like `git clone` does; they are left in
+# place on failure, only <directory> itself is removed.
+while [ "$destination" != "${destination%/}" ] && [ "$destination" != / ]; do
+    destination=${destination%/}
+done
+case $destination in
+    */*) parent=${destination%/*} ;;
+    *) parent=. ;;
+esac
+mkdir -p -- "${parent:-/}"
+mkdir -- "$destination"
+destination=$(CDPATH='' cd -- "$destination" && pwd)
+cleanup() {
+    status=$?
+    if [ "$status" -ne 0 ]; then
+        rm -rf -- "$destination"
+        echo "$me: removed the partial clone at $destination" >&2
+    fi
+}
+trap cleanup EXIT
+trap 'exit 130' HUP INT TERM
+git clone --bare -- "$repository" "$destination/.git"
+git --git-dir="$destination/.git" config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+git --git-dir="$destination/.git" fetch origin
+git --git-dir="$destination/.git" remote set-head origin --auto
+remote_head=$(git --git-dir="$destination/.git" symbolic-ref refs/remotes/origin/HEAD)
+branch=${remote_head#refs/remotes/origin/}
+git --git-dir="$destination/.git" branch --set-upstream-to="origin/$branch" "$branch"
+
+# Create the checkout with Git so its location doesn't depend on accepting
+# Worktrunk's layout prompt or having the newer `wt switch --path` option.
+directory=$(printf '%s' "$branch" | tr '\\/' '--')
+checkout=$destination/$directory
+git --git-dir="$destination/.git" worktree add -- "$checkout" "$branch"
+trap - EXIT HUP INT TERM
+
+finish "$destination" "$branch" "$checkout"

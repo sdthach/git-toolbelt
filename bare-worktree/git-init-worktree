@@ -1,0 +1,187 @@
+#!/bin/sh
+#
+# git init-worktree: start a brand-new repository in the bare-worktree layout.
+#
+#   <directory>/.git      a new bare repository
+#   <directory>/<branch>  a worktree for <branch>, holding one empty commit
+#
+# The branch is --branch, else init.defaultBranch, else main. The empty root
+# commit gives `wt switch -c` something to branch from. Needs git 2.42 or
+# later, for `git worktree add --orphan`.
+set -eu
+
+me="git init-worktree"
+
+# `git --git-dir=... <verb>` exports GIT_DIR and friends to the subcommand, and
+# a shell may have them exported. They would point every git call below at
+# the wrong repository, so they are cleared. -c settings stay.
+unset GIT_DIR GIT_WORK_TREE GIT_IMPLICIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE \
+    GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG GIT_GRAFT_FILE \
+    GIT_NO_REPLACE_OBJECTS GIT_REPLACE_REF_BASE GIT_PREFIX GIT_SHALLOW_FILE GIT_NAMESPACE
+
+usage() {
+    echo "usage: git init-worktree <directory> [--branch <name>]"
+}
+
+directory=
+have_directory=0
+branch=
+while [ "$#" -gt 0 ]; do
+    case $1 in
+        -h | --help)
+            usage
+            exit 0
+            ;;
+        --branch)
+            if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+                usage >&2
+                exit 2
+            fi
+            branch=$2
+            shift 2
+            continue
+            ;;
+        --branch=?*)
+            branch=${1#--branch=}
+            ;;
+        -*)
+            usage >&2
+            exit 2
+            ;;
+        *)
+            if [ "$have_directory" = 1 ] || [ -z "$1" ]; then
+                usage >&2
+                exit 2
+            fi
+            directory=$1
+            have_directory=1
+            ;;
+    esac
+    shift
+done
+
+if [ "$have_directory" = 0 ]; then
+    usage >&2
+    exit 2
+fi
+
+if ! command -v wt >/dev/null 2>&1; then
+    cat >&2 <<EOF
+$me: Worktrunk (wt) is required but was not found on PATH.
+  Install: https://github.com/max-sixty/worktrunk#install
+  Setup:   https://github.com/sdthach/git-toolbelt/blob/main/bare-worktree/docs/getting-started.md#setting-up-worktrunk
+EOF
+    exit 1
+fi
+
+refuse() {
+    printf '%s: %s\n' "$me" "$*" >&2
+    exit 1
+}
+
+warn() {
+    printf '%s: warning: %s\n' "$me" "$*" >&2
+}
+
+# Quote a word for copy-pasting into a shell, only when it needs it.
+quote() {
+    case $1 in
+        "" | *[!A-Za-z0-9_./:@%+=,-]*)
+            printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+            ;;
+        *) printf '%s' "$1" ;;
+    esac
+}
+
+# Shared tail of clone, init and convert: let Worktrunk see the new worktree,
+# register it with zoxide, and print where it is.
+finish() {
+    container=$1
+    branch=$2
+    checkout=$3
+    if wt -C "$container" switch "$branch" --no-cd --no-hooks; then
+        :
+    else
+        warn "'wt switch' failed (exit $?); the checkout is ready, but Worktrunk did not confirm it"
+    fi
+    has_zoxide=0
+    if command -v zoxide >/dev/null 2>&1; then
+        has_zoxide=1
+        if zoxide add "$checkout"; then
+            :
+        else
+            warn "'zoxide add' failed (exit $?); the checkout is ready, but zoxide does not know it yet"
+        fi
+    fi
+    printf '\nCheckout: %s\n' "$checkout"
+    printf 'Next:     cd %s   # or: wt -C %s switch %s' \
+        "$(quote "$checkout")" "$(quote "$container")" "$(quote "$branch")"
+    if [ "$has_zoxide" = 1 ]; then
+        printf '   |   z %s %s' "$(quote "${container##*/}")" "$(quote "${checkout##*/}")"
+    fi
+    printf '\n'
+}
+
+# `git worktree add --orphan` arrived in git 2.42.
+version=$(git --version | sed -n 's/^git version \([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1 \2/p')
+if [ -n "$version" ]; then
+    major=${version% *}
+    minor=${version#* }
+    if [ "$major" -lt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -lt 42 ]; }; then
+        refuse "git 2.42 or later is required for 'git worktree add --orphan' (found $(git --version))"
+    fi
+fi
+
+if [ -e "$directory" ] || [ -L "$directory" ]; then
+    refuse "'$directory' already exists"
+fi
+
+# Read the default the way `git init` would, without picking up the local
+# config of whatever repository the current directory happens to be in.
+if [ -z "$branch" ]; then
+    branch=$(git -C / config --get init.defaultBranch || true)
+    branch=${branch:-main}
+fi
+if ! git check-ref-format --branch "$branch" >/dev/null 2>&1; then
+    refuse "'$branch' is not a valid branch name"
+fi
+
+# The root commit needs an identity. Check it now, so a missing user.name or
+# user.email stops the command before it creates anything.
+if ! git -C / var GIT_AUTHOR_IDENT >/dev/null || ! git -C / var GIT_COMMITTER_IDENT >/dev/null; then
+    refuse "set user.name and user.email first; nothing was created"
+fi
+
+# Everything under <directory> is ours from here on: if a step fails, remove
+# it rather than leave half a repository behind.
+# Missing parent folders are created like `git init` does; they are left in
+# place on failure, only <directory> itself is removed.
+while [ "$directory" != "${directory%/}" ] && [ "$directory" != / ]; do
+    directory=${directory%/}
+done
+case $directory in
+    */*) parent=${directory%/*} ;;
+    *) parent=. ;;
+esac
+mkdir -p -- "${parent:-/}"
+mkdir -- "$directory"
+container=$(CDPATH='' cd -- "$directory" && pwd)
+cleanup() {
+    status=$?
+    if [ "$status" -ne 0 ]; then
+        rm -rf -- "$container"
+        echo "$me: removed the partial repository at $container" >&2
+    fi
+}
+trap cleanup EXIT
+trap 'exit 130' HUP INT TERM
+git init --bare -b "$branch" -- "$container/.git"
+checkout=$container/$(printf '%s' "$branch" | tr '\\/' '--')
+git --git-dir="$container/.git" worktree add --orphan -b "$branch" -- "$checkout"
+# Your hooks are for your commits; this empty root commit only gives
+# `wt switch -c` a base. commit.gpgSign still applies, so a signed-commit
+# setup gets a signed root (and a failed signature removes the repository).
+git -C "$checkout" commit --quiet --no-verify --allow-empty -m "Initial commit"
+trap - EXIT HUP INT TERM
+
+finish "$container" "$branch" "$checkout"

@@ -56,7 +56,7 @@ jobs:
           # conventional subject below, so the sync produces exactly one
           # CHANGELOG entry and one version bump.
           body="Automated weekly sync of upstream/main. Review for conflicts with"
-          body="$body fork-only files (docs, README, portmanteaus, scripts) first."
+          body="$body fork-only files (docs, README, portmanteaus, bare-worktree, scripts) first."
           body="$body\n\n**Squash-merge this PR** so release-please sees one"
           body="$body classified subject instead of upstream's unclassifiable ones."
           body="$body Retitle to \`fix:\` if the sync is fixes only."
