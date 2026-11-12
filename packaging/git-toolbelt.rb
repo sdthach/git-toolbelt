@@ -33,13 +33,13 @@ class GitToolbelt < Formula
     # A stable build unpacks the release tarball, which already has the
     # flattened bin/ and the bare-worktree docs and samples under share/. A
     # --HEAD build gets the repo layout instead, where the commands are still
-    # split between the root, portmanteaus/ and bare-worktree/. 83 commands in
-    # all: 63 + 14 + 6.
+    # split between the root, portmanteaus/ and bare-worktree/. 81 commands in
+    # all: 61 + 14 + 6.
     if File.directory?("bin")
       bin.install Dir["bin/*"]
       pkgshare.install "share/git-toolbelt/bare-worktree"
     else
-      bin.install Dir["git-*"]               # the 63 git-<verb> subcommands
+      bin.install Dir["git-*"]               # the 61 git-<verb> subcommands
       bin.install Dir["portmanteaus/*"]      # the 14 g+verb shortcuts (getch, gush, gome, ...)
       bin.install Dir["bare-worktree/git-*"] # the 6 bare-repo + worktree commands
       # Only git-* from bare-worktree/ is a command; the rest is docs and

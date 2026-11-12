@@ -10,7 +10,6 @@ Back to the [README](../README.md).
 - [git-current-branch](#git-current-branch)
 - [git-main-branch](#git-main-branch)
 - ⭐️ [git-fixup](#git-fixup)
-- [git-autofixup](#git-autofixup)
 - ⭐️ [git-fixup-with](#git-fixup-with)
 - ⭐️ [git-active-branches](#git-local-branches--git-remote-branches--git-active-branches)
 - ⭐️ [git-diff-since](#git-diff-since)
@@ -30,7 +29,6 @@ Back to the [README](../README.md).
 - [git-workon](#git-workon)
 - ⭐️ [git-modified](#git-modified)
 - ⭐️ [git-modified-since](#git-modified-since)
-- [git-last-commit-to-file](#git-last-commit-to-file)
 - ⭐️ [git-separator](#git-separator)
 - ⭐️ [git-spinoff](#git-spinoff)
 - ⭐️ [git-wip](#git-wip)
@@ -131,22 +129,29 @@ Returns a list of locally modified files. In contrast to git status, it does not
 This makes it ideal for the following use-case:
 
 ```console
-$ vim (git modified)
+$ vim $(git modified)
 ```
 
 If you want to locally modified files that are already staged, too, use:
 
 ```console
-$ vim (git modified -i)
+$ vim $(git modified -i)
 ```
 
-To restrict the result to one or more paths, pass pathspecs after `--`. For example, to list locally modified files inside the current directory only:
+To restrict the result to one or more paths, pass pathspecs after `--`:
 
 ```console
+$ git modified -- src/
+```
+
+Pathspecs are relative to the current directory, so from within a subdirectory this lists only the modified files at or below it:
+
+```console
+$ cd src/
 $ git modified -- .
 ```
 
-> **Cross-platform:** this command uses portable `awk` instead of `rev` (which Git for Windows / Git Bash does not ship), so it works everywhere. See the [fix](https://github.com/sdthach/git-toolbelt/commit/a10fd2c47e6e365073dc21ab0caf4ac69465ca65) for [nvie#29](https://github.com/nvie/git-toolbelt/issues/29).
+> **Cross-platform:** this command no longer needs `rev` (which Git for Windows / Git Bash does not ship), so it works everywhere. Upstream fixed this in [nvie#72](https://github.com/nvie/git-toolbelt/pull/72), which replaced this fork's earlier `awk` workaround for [nvie#29](https://github.com/nvie/git-toolbelt/issues/29).
 
 ### git modified-since
 
@@ -155,29 +160,8 @@ Like git-modified, but for printing a list of files that have been modified sinc
 Opens all files modified on your branch (since you branched off `main`).
 
 ```console
-$ vim (git modified-since)
+$ vim $(git modified-since)
 ```
-
-### git last-commit-to-file
-
-Returns the SHA of the commit that last touched the given file(s). If multiple files are given, returns the SHA that most recently changed *any* of them.
-
-```console
-$ git last-commit-to-file somefile.txt
-```
-
-Used internally by `git-autofixup` to find which commit to fixup against.
-
-### git autofixup
-
-Looks at your currently staged files, figures out which commit last touched each of them (via `git-last-commit-to-file`), and runs `git commit --fixup <sha>` against that commit automatically — no need to remember or look up the SHA yourself.
-
-```console
-$ git add somefile.txt
-$ git autofixup
-```
-
-Errors out if no staged files have been previously committed, or if it can't determine a single commit that touched them.
 
 ### git separator
 
@@ -221,7 +205,7 @@ Tests if the given local branch, remote branch, or tag exists.
 
 ### git relative-path
 
-Resolves one or more paths (relative to the repo root) to paths relative to the current working directory, using GNU `realpath`/`grealpath` under the hood. Used internally by `git-autofixup` to turn `git diff` output back into paths you can pass to other commands from wherever you're standing in the tree.
+Resolves one or more paths (relative to the repo root) to paths relative to the current working directory, using GNU `realpath`/`grealpath` under the hood. Useful for turning `git diff` output back into paths you can pass to other commands from wherever you're standing in the tree.
 
 ```console
 $ cd sub/dir
@@ -340,6 +324,8 @@ Ever been on a branch and really wanted to quickly commit a change to a differen
     $ git commit-to main -m "Add foo to main."
     $ git add bar.txt
     $ git commit -m "Add bar to mybranch."
+
+Only the staged changes move to the other branch, unstaged changes are left alone. If a file that moves also has unstaged changes, git commit-to will refuse to remove the commit from the current branch, rather than overwrite them.
 
 ### git cherry-pick-to
 

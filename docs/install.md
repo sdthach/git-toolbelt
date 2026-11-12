@@ -6,6 +6,7 @@ Back to the [README](../README.md).
 
 - **[mise](https://mise.jdx.dev) or [Homebrew](https://brew.sh)** — either one installs the toolbelt; both install the exact same build. For mise: `curl https://mise.run | sh`, then [activate it in your shell](https://mise.jdx.dev/getting-started.html).
 - **git** — required. Everything in this toolbelt is a thin wrapper around `git` plumbing/porcelain.
+- **A Unix shell** — these are POSIX `sh` scripts. On Windows, use Git for Windows (Git Bash) or WSL; they will not run in native PowerShell.
 - **GNU coreutils (`realpath`)** — only needed by [`git-relative-path`](commands.md#git-relative-path). Native on Linux (and therefore on WSL). On macOS: `mise use -g coreutils` or `brew install coreutils`.
 - **[`fzf`][fzf]** — optional, only used by [`git-fixup-with`](commands.md#git-fixup-with) for its interactive commit picker. `mise use -g fzf` if you want that command.
 - **[Worktrunk](https://github.com/max-sixty/worktrunk) (`wt`)** — only needed by the [bare-worktree commands](https://github.com/sdthach/git-toolbelt/blob/main/bare-worktree/README.md). Install with `mise use -g worktrunk` (recommended), `brew install worktrunk` or `cargo install worktrunk`; other options are in [Worktrunk's README](https://github.com/max-sixty/worktrunk#install). Then follow [Setting up Worktrunk](https://github.com/sdthach/git-toolbelt/blob/main/bare-worktree/docs/getting-started.md#setting-up-worktrunk).
@@ -27,7 +28,7 @@ That records the tool in `~/.config/mise/config.toml`:
 "github:sdthach/git-toolbelt" = "latest"
 ```
 
-All 83 commands land on `PATH` — the `git-*` scripts resolve as `git <verb>` subcommands, and the `g`+verb shortcuts as standalone commands:
+All 81 commands land on `PATH` — the `git-*` scripts resolve as `git <verb>` subcommands, and the `g`+verb shortcuts as standalone commands:
 
 ```console
 $ git main-branch
@@ -83,6 +84,8 @@ $ mise run ci       # everything CI runs: lint + smoke test
 
 `mise run setup` configures things that live in `.git/config` and therefore can't
 travel with a clone — see [maintaining-the-fork](maintaining-the-fork.md#remotes).
+
+The upstream `Makefile` (`make link` / `make unlink`) also works in a clone, but it only symlinks the root `git-*` scripts into `~/.local/bin` or `~/bin`. It does not link `portmanteaus/` or `bare-worktree/`, so use the mise environment above (or a package install) to get all of them.
 
 `direnv` users get the same environment via the checked-in `.envrc` (`direnv allow` once) — it delegates to mise rather than duplicating the `PATH` list.
 
