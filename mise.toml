@@ -9,16 +9,17 @@ uv = "latest"
 yamllint = "latest"
 
 [env]
-# The working tree keeps the upstream git-* scripts at the root and the fork's
-# shortcuts in portmanteaus/; only the release tarball flattens both into bin/.
-# Put both directories on PATH so the commands resolve while you edit them.
-_.path = [".", "portmanteaus"]
+# The working tree keeps the upstream git-* scripts at the root, the fork's
+# shortcuts in portmanteaus/ and its bare-repo + worktree commands in
+# bare-worktree/; only the release tarball flattens them into bin/. Put all
+# three directories on PATH so the commands resolve while you edit them.
+_.path = [".", "portmanteaus", "bare-worktree"]
 
 [tasks."lint:sh"]
 description = "shellcheck, at the same severities CI uses"
 run = [
   # The fork's own scripts are held to shellcheck's full default severity.
-  "shellcheck -s sh portmanteaus/* scripts/*.sh git-toolbelt",
+  "shellcheck -s sh portmanteaus/* bare-worktree/git-* scripts/*.sh git-toolbelt",
   # Upstream git-* scripts stay byte-for-byte identical to nvie/git-toolbelt so
   # upstream merges stay clean, and they carry pre-existing style/info/warning
   # findings. Lint them at error severity to catch genuine bugs from a future

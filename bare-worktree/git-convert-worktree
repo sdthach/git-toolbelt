@@ -1,0 +1,536 @@
+#!/bin/sh
+#
+# git convert-worktree: convert an existing normal clone, in place, into the
+# bare-worktree layout.
+#
+#   before:  <repo>/.git (normal) + your files in <repo>/
+#   after:   <repo>/.git (bare)   + your files in <repo>/<branch>/
+#
+# Every file moves by rename inside <repo>, so dirty, staged, untracked and
+# ignored files all survive and even a large build directory moves instantly.
+# Linked worktrees nested inside the old working tree are repaired; ones
+# outside the repo need nothing. The command refuses, changing nothing, when
+# the state is something it would have to guess about.
+set -eu
+
+me="git convert-worktree"
+
+# `git --git-dir=... convert-worktree` exports GIT_DIR and friends, and a
+# shell may have them exported. They would point the git calls below at the
+# wrong repository (and step 5 at the main .git), so they are cleared; the
+# repository is always the one named by [path] (default: the current
+# directory); GIT_DIR never picks it. When GIT_DIR or GIT_WORK_TREE was set,
+# it must name that same repository (checked below), so
+# `git --git-dir=<repo>/.git convert-worktree <repo>` converts <repo>, and
+# the same command without <repo>, run outside <repo>, is refused.
+env_git_dir=${GIT_DIR-}
+env_work_tree=${GIT_WORK_TREE-}
+unset GIT_DIR GIT_WORK_TREE GIT_IMPLICIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE \
+    GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG GIT_GRAFT_FILE \
+    GIT_NO_REPLACE_OBJECTS GIT_REPLACE_REF_BASE GIT_PREFIX GIT_SHALLOW_FILE GIT_NAMESPACE
+
+usage() {
+    echo "usage: git convert-worktree [path] [--dry-run]"
+}
+
+path=.
+have_path=0
+dry_run=0
+for arg do
+    case $arg in
+        -h | --help)
+            usage
+            exit 0
+            ;;
+        --dry-run)
+            dry_run=1
+            ;;
+        -*)
+            usage >&2
+            exit 2
+            ;;
+        *)
+            if [ "$have_path" = 1 ] || [ -z "$arg" ]; then
+                usage >&2
+                exit 2
+            fi
+            path=$arg
+            have_path=1
+            ;;
+    esac
+done
+
+if ! command -v wt >/dev/null 2>&1; then
+    cat >&2 <<EOF
+$me: Worktrunk (wt) is required but was not found on PATH.
+  Install: https://github.com/max-sixty/worktrunk#install
+  Setup:   https://github.com/sdthach/git-toolbelt/blob/main/bare-worktree/docs/getting-started.md#setting-up-worktrunk
+EOF
+    exit 1
+fi
+
+refuse() {
+    printf '%s: %s\n' "$me" "$*" >&2
+    exit 1
+}
+
+warn() {
+    printf '%s: warning: %s\n' "$me" "$*" >&2
+}
+
+# Quote a word for copy-pasting into a shell, only when it needs it.
+quote() {
+    case $1 in
+        "" | *[!A-Za-z0-9_./:@%+=,-]*)
+            printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+            ;;
+        *) printf '%s' "$1" ;;
+    esac
+}
+
+# Shared tail of clone, init and convert: let Worktrunk see the new worktree,
+# register it with zoxide, and print where it is.
+finish() {
+    container=$1
+    branch=$2
+    checkout=$3
+    if wt -C "$container" switch "$branch" --no-cd --no-hooks; then
+        :
+    else
+        warn "'wt switch' failed (exit $?); the checkout is ready, but Worktrunk did not confirm it"
+    fi
+    has_zoxide=0
+    if command -v zoxide >/dev/null 2>&1; then
+        has_zoxide=1
+        if zoxide add "$checkout"; then
+            :
+        else
+            warn "'zoxide add' failed (exit $?); the checkout is ready, but zoxide does not know it yet"
+        fi
+    fi
+    printf '\nCheckout: %s\n' "$checkout"
+    printf 'Next:     cd %s   # or: wt -C %s switch %s' \
+        "$(quote "$checkout")" "$(quote "$container")" "$(quote "$branch")"
+    if [ "$has_zoxide" = 1 ]; then
+        printf '   |   z %s %s' "$(quote "${container##*/}")" "$(quote "${checkout##*/}")"
+    fi
+    printf '\n'
+}
+
+# real_path <path>: the physical absolute path of a directory, or nothing.
+real_path() {
+    (CDPATH='' cd -P -- "$1" 2>/dev/null && pwd -P) || true
+}
+
+# Move every entry of $1, dotfiles included, into $2, except .git and the
+# stage directory.
+move_entries() {
+    for entry in "$1"/* "$1"/.[!.]* "$1"/..?*; do
+        if [ ! -e "$entry" ] && [ ! -L "$entry" ]; then
+            continue
+        fi
+        case ${entry##*/} in
+            .git | "$stage_name") continue ;;
+        esac
+        mv -- "$entry" "$2/"
+    done
+}
+
+# --- Checks. Nothing below changes anything until "Conversion". ---
+
+if [ ! -d "$path" ]; then
+    refuse "'$path' is not a directory"
+fi
+if ! git -C "$path" rev-parse --git-dir >/dev/null 2>&1; then
+    refuse "'$path' is not inside a git repository"
+fi
+if [ "$(git -C "$path" rev-parse --is-bare-repository)" = true ]; then
+    refuse "'$path' is already a bare repository; there is nothing to convert"
+fi
+if ! top=$(git -C "$path" rev-parse --show-toplevel 2>/dev/null) || [ -z "$top" ]; then
+    refuse "'$path' is not inside a working tree"
+fi
+gitdir=$(git -C "$top" rev-parse --absolute-git-dir)
+common=$(git -C "$top" rev-parse --path-format=absolute --git-common-dir)
+if [ "$gitdir" != "$common" ]; then
+    refuse "'$top' is a linked worktree; convert the repository's main worktree instead (${common%/.git})"
+fi
+if [ ! -d "$top/.git" ] || [ -L "$top/.git" ] ||
+    [ "$(CDPATH='' cd -P -- "$top/.git" && pwd -P)" != "$(CDPATH='' cd -P -- "$gitdir" && pwd -P)" ]; then
+    refuse "the git directory is not '$top/.git' (a separate git dir or core.worktree); only the standard layout can be converted"
+fi
+if [ -n "$env_git_dir" ] && [ "$(real_path "$env_git_dir")" != "$(real_path "$gitdir")" ]; then
+    refuse "GIT_DIR ($env_git_dir) is not the git directory of '$top'; unset it, or pass the matching path"
+fi
+if [ -n "$env_work_tree" ] && [ "$(real_path "$env_work_tree")" != "$(real_path "$top")" ]; then
+    refuse "GIT_WORK_TREE ($env_work_tree) is not '$top'; unset it, or pass the matching path"
+fi
+if [ "$(real_path "$top")" = / ] || { [ -n "${HOME:-}" ] && [ "$(real_path "$top")" = "$(real_path "$HOME")" ]; }; then
+    refuse "'$top' is your home directory or /; moving everything in it is not supported"
+fi
+if ! head_ref=$(git -C "$top" symbolic-ref -q HEAD); then
+    refuse "HEAD is detached; check out a branch first (git switch <branch>)"
+fi
+case $head_ref in
+    refs/heads/?*) branch=${head_ref#refs/heads/} ;;
+    *) refuse "HEAD points at '$head_ref', not a local branch" ;;
+esac
+if ! git -C "$top" rev-parse -q --verify HEAD >/dev/null; then
+    refuse "branch '$branch' has no commits yet; make a first commit, then convert"
+fi
+for marker in MERGE_HEAD:merge rebase-merge:rebase rebase-apply:rebase \
+    CHERRY_PICK_HEAD:cherry-pick REVERT_HEAD:revert sequencer:cherry-pick/revert \
+    BISECT_LOG:bisect; do
+    if [ -e "$gitdir/${marker%%:*}" ]; then
+        refuse "a ${marker#*:} is in progress; finish or abort it first"
+    fi
+done
+if [ -e "$gitdir/modules" ]; then
+    refuse "submodules are initialised ('$gitdir/modules' exists); converting them is not supported"
+fi
+if [ "$(git -C "$top" config --bool --get core.sparseCheckout || true)" = true ]; then
+    refuse "sparse checkout is on; run 'git sparse-checkout disable' first"
+fi
+if [ -e "$gitdir/index.lock" ]; then
+    refuse "'$gitdir/index.lock' exists: another git process is running, or one crashed (then remove the file)"
+fi
+
+directory=$(printf '%s' "$branch" | tr '\\/' '--')
+checkout=$top/$directory
+stage_name=.convert-worktree.$$
+stage=$top/$stage_name
+old_core_worktree=$(git --git-dir="$gitdir" config --get core.worktree || true)
+# With extensions.worktreeConfig, a core.bare in the shared config applies to
+# every worktree, so the main worktree's own config.worktree holds it instead.
+worktree_config=$(git --git-dir="$gitdir" config --bool --get extensions.worktreeConfig || true)
+if [ "$worktree_config" = true ]; then
+    bare_setting="core.bare true in .git/config.worktree (extensions.worktreeConfig is on)"
+else
+    bare_setting="git config core.bare true"
+fi
+
+# Step 1: record the linked worktrees. The first entry is this main worktree.
+worktrees=$(git -C "$top" worktree list --porcelain | sed -n 's/^worktree //p')
+others=0
+nested=
+nested_count=0
+while IFS= read -r wt_path; do
+    if [ -z "$wt_path" ] || [ "$wt_path" = "$top" ]; then
+        continue
+    fi
+    others=$((others + 1))
+    if [ "$wt_path" = "$checkout" ]; then
+        refuse "a linked worktree is already registered at '$checkout'"
+    fi
+    case $wt_path in
+        "$top"/*)
+            nested="$nested$wt_path
+"
+            nested_count=$((nested_count + 1))
+            ;;
+    esac
+done <<EOF
+$worktrees
+EOF
+
+if [ -e "$stage" ] || [ -L "$stage" ]; then
+    refuse "'$stage' already exists"
+fi
+
+# Step 2 renames every top-level entry. A rename needs write access to the
+# folder it leaves, and a directory that changes parent must be writable
+# itself; check it all now, so step 2 can't stop halfway.
+if [ ! -w "$top" ]; then
+    refuse "'$top' is not writable"
+fi
+for entry in "$top"/* "$top"/.[!.]* "$top"/..?*; do
+    if [ -d "$entry" ] && [ ! -L "$entry" ] && [ "${entry##*/}" != .git ] && [ ! -w "$entry" ]; then
+        refuse "'$entry' is not writable, so it can't be moved; make it writable (chmod u+w) and retry"
+    fi
+done
+outside=$((others - nested_count))
+
+if fetch_refspec=$(git --git-dir="$gitdir" config --get-all remote.origin.fetch); then
+    refspec_plan="keep remote.origin.fetch as it is ($fetch_refspec)"
+    set_refspec=0
+elif git --git-dir="$gitdir" config --get remote.origin.url >/dev/null; then
+    refspec_plan="set remote.origin.fetch to +refs/heads/*:refs/remotes/origin/*"
+    set_refspec=1
+else
+    refspec_plan="no origin remote: leave the remote config alone"
+    set_refspec=0
+fi
+
+if [ "$dry_run" = 1 ]; then
+    entries=0
+    for entry in "$top"/* "$top"/.[!.]* "$top"/..?*; do
+        if [ -e "$entry" ] || [ -L "$entry" ]; then
+            case ${entry##*/} in .git) ;; *) entries=$((entries + 1)) ;; esac
+        fi
+    done
+    echo "Dry run: nothing was changed."
+    echo "Repository: $top"
+    echo "Branch:     $branch"
+    echo "Worktree:   $checkout"
+    echo "Steps:"
+    echo "  1. record the worktree list ($others linked worktree(s), $nested_count nested inside the repo)"
+    echo "  2. move $entries top-level entr(ies), everything except .git, into $top/.convert-worktree.<pid>"
+    if [ -n "$old_core_worktree" ]; then
+        echo "  3. $bare_setting, and unset core.worktree ($old_core_worktree)"
+    else
+        echo "  3. $bare_setting"
+    fi
+    echo "  4. git worktree add --no-checkout $checkout $branch"
+    echo "  5. copy .git/index (with any split-index sharedindex.* files) and .git/logs/HEAD into the new worktree's git dir; move .git/config.worktree if present"
+    echo "  6. move the staged entries into $checkout"
+    if [ -n "$nested" ]; then
+        echo "  7. git worktree repair for the nested linked worktree(s):"
+        printf '%s' "$nested" | while IFS= read -r wt_path; do
+            echo "       $wt_path -> $checkout/${wt_path#"$top"/}"
+        done
+    else
+        echo "  7. no nested linked worktrees to repair"
+    fi
+    if git --git-dir="$gitdir" config --get remote.origin.url >/dev/null; then
+        echo "  8. $refspec_plan; git remote set-head origin --auto"
+    else
+        echo "  8. $refspec_plan"
+    fi
+    echo "  9. wt -C $top switch $branch --no-cd --no-hooks"
+    exit 0
+fi
+
+# --- Conversion. A failure from step 2 to step 6 prints recovery steps. ---
+
+step=1
+refspec_written=0
+wt_admin=
+index_copied=0
+config_worktree_moved=0
+admin_before=$(ls -A "$gitdir/worktrees" 2> /dev/null || true)
+
+# The git dir entries `git worktree add` created in this run: a name under
+# .git/worktrees that wasn't there before step 4.
+new_admin_entries() {
+    for admin in "$gitdir"/worktrees/* "$gitdir"/worktrees/.[!.]*; do
+        if [ ! -e "$admin" ]; then
+            continue
+        fi
+        if ! printf '%s\n' "$admin_before" | grep -Fxq -- "${admin##*/}"; then
+            printf '%s\n' "${admin##*/}"
+        fi
+    done
+}
+
+repair_command() {
+    printf 'git -C %s worktree repair' "$(quote "$checkout")"
+    for moved do
+        printf ' %s' "$(quote "$moved")"
+    done
+}
+
+recovery() {
+    if [ "$step" -ge 7 ]; then
+        echo "$me: stopped at step $step, after every file was in place in $checkout."
+        if [ "$step" -eq 7 ] && [ -n "$nested" ]; then
+            echo "  Repair the linked worktrees that moved with the files:"
+            echo "    $(repair_command "$@")"
+        fi
+        if [ "$step" -ge 8 ]; then
+            echo "  Finish the remote setup:"
+            if [ "$set_refspec" = 1 ] && [ "$refspec_written" = 0 ]; then
+                echo "    git -C $(quote "$checkout") config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'"
+            fi
+            if git --git-dir="$gitdir" config --get remote.origin.url > /dev/null; then
+                echo "    git -C $(quote "$checkout") remote set-head origin --auto"
+            fi
+        fi
+        return
+    fi
+    echo "$me: stopped at step $step; nothing was rolled back."
+    if [ "$step" -eq 2 ]; then
+        echo "  Some of your files are in $(quote "$stage"), the rest are still in $(quote "$top")."
+    elif [ "$step" -ge 6 ]; then
+        echo "  Your files are in $(quote "$stage") and partly in $(quote "$checkout")."
+    else
+        echo "  Your files are in $(quote "$stage")."
+    fi
+    echo "  To restore the original clone, run these commands in order:"
+    echo
+    echo "    cd -- $(quote "$top")"
+    if [ "$step" -ge 6 ]; then
+        echo "    (cd -- $(quote "$directory") && for f in * .[!.]* ..?*; do if [ -e \"\$f\" ] || [ -L \"\$f\" ]; then [ \"\$f\" = .git ] || mv -- \"\$f\" ../$(quote "$stage_name")/; fi; done)"
+    fi
+    if [ "$step" -ge 4 ]; then
+        echo "    [ ! -d $(quote "$directory") ] || { rm -f -- $(quote "$directory/.git") && rmdir -- $(quote "$directory"); }"
+    fi
+    echo "    (cd -- $(quote "$stage_name") && for f in * .[!.]* ..?*; do if [ -e \"\$f\" ] || [ -L \"\$f\" ]; then mv -- \"\$f\" ../; fi; done) && rmdir -- $(quote "$stage_name")"
+    if [ "$index_copied" = 1 ]; then
+        echo "    cp -p -- $(quote ".git/worktrees/$wt_admin/index") .git/index"
+    fi
+    if [ "$config_worktree_moved" = 1 ]; then
+        echo "    mv -- $(quote ".git/worktrees/$wt_admin/config.worktree") .git/config.worktree"
+    elif [ "$worktree_config" = true ] && [ "$step" -ge 3 ]; then
+        echo "    git config --file .git/config.worktree --unset core.bare"
+        if [ "$step" -ge 5 ]; then
+            echo "    rm -f -- $(quote ".git/config.worktree.convert.$$")"
+        fi
+    fi
+    if [ "$step" -ge 3 ] && [ "$worktree_config" != true ]; then
+        echo "    git config core.bare false"
+    fi
+    if [ "$step" -ge 3 ] && [ -n "$old_core_worktree" ]; then
+        echo "    git config core.worktree $(quote "$old_core_worktree")"
+    fi
+    # Only what this run's `git worktree add` created; never a prune, which
+    # would also drop worktrees that are just unreachable right now.
+    if [ "$step" -ge 4 ]; then
+        new_admin_entries | while IFS= read -r admin; do
+            echo "    rm -rf -- $(quote ".git/worktrees/$admin")"
+        done
+    fi
+    echo
+}
+
+on_exit() {
+    status=$?
+    if [ "$status" -ne 0 ] && [ "$step" -ge 2 ]; then
+        recovery "$@" >&2
+    fi
+}
+
+# The paths the nested linked worktrees move to, as "$@".
+set --
+while IFS= read -r wt_path; do
+    if [ -n "$wt_path" ]; then
+        set -- "$@" "$checkout/${wt_path#"$top"/}"
+    fi
+done <<EOF
+$nested
+EOF
+
+# Steps 2 to 7 are renames and small writes that take milliseconds. Don't
+# let a signal stop them halfway; a stop there is the one that needs manual
+# recovery.
+trap 'on_exit "$@"' EXIT
+trap '' HUP INT TERM
+
+# Step 2: stage everything except .git, so nothing clashes with the new
+# worktree folder (a tracked directory may have the branch's name).
+mkdir -- "$stage"
+step=2
+move_entries "$top" "$stage"
+
+# Step 3: the repository becomes bare.
+step=3
+if [ "$worktree_config" = true ]; then
+    git config --file "$gitdir/config.worktree" core.bare true
+else
+    git --git-dir="$gitdir" config core.bare true
+fi
+if [ -n "$old_core_worktree" ]; then
+    git --git-dir="$gitdir" config --unset core.worktree
+fi
+
+# Step 4: register the branch's worktree without touching any file.
+step=4
+# No hooks: they would run with the signals above ignored, and nothing here
+# needs one (the files are moved in, not checked out).
+git --git-dir="$gitdir" -c core.hooksPath=/dev/null worktree add --no-checkout -- "$checkout" "$branch"
+wt_admin=$(new_admin_entries)
+wt_gitdir=$(git -C "$checkout" rev-parse --absolute-git-dir)
+case $wt_admin in
+    "" | *'
+'*)
+        printf '%s: expected one new entry in %s, found: %s\n' "$me" "$gitdir/worktrees" "${wt_admin:-none}" >&2
+        exit 1
+        ;;
+esac
+if [ "$(real_path "$wt_gitdir")" != "$(real_path "$gitdir/worktrees/$wt_admin")" ]; then
+    echo "$me: the new worktree's git dir is $wt_gitdir, not $gitdir/worktrees/$wt_admin" >&2
+    exit 1
+fi
+wt_gitdir=$gitdir/worktrees/$wt_admin
+
+# Step 5: carry the index (staged changes, and the shared index of a split
+# index), the HEAD reflog and any per-worktree config over to the new
+# worktree.
+step=5
+if [ -f "$gitdir/index" ]; then
+    for shared in "$gitdir"/sharedindex.*; do
+        if [ -f "$shared" ]; then
+            cp -p -- "$shared" "$wt_gitdir/"
+        fi
+    done
+    cp -p -- "$gitdir/index" "$wt_gitdir/index"
+    index_copied=1
+fi
+if [ -f "$gitdir/logs/HEAD" ]; then
+    mkdir -p -- "$wt_gitdir/logs"
+    cp -p -- "$gitdir/logs/HEAD" "$wt_gitdir/logs/HEAD"
+fi
+if [ "$worktree_config" = true ]; then
+    # The main worktree's settings now belong to the new worktree, minus the
+    # core.bare added in step 3; the bare repository keeps only core.bare.
+    # The replacement is written beside it and renamed into place, so the
+    # original is never half-written.
+    cp -p -- "$gitdir/config.worktree" "$wt_gitdir/config.worktree"
+    git config --file "$wt_gitdir/config.worktree" --unset core.bare
+    printf '[core]\n\tbare = true\n' > "$gitdir/config.worktree.convert.$$"
+    mv -- "$gitdir/config.worktree.convert.$$" "$gitdir/config.worktree"
+    config_worktree_moved=1
+elif [ -f "$gitdir/config.worktree" ]; then
+    mv -- "$gitdir/config.worktree" "$wt_gitdir/config.worktree"
+    config_worktree_moved=1
+fi
+if [ "$index_copied" = 0 ]; then
+    git -C "$checkout" -c core.fsmonitor=false read-tree HEAD
+fi
+# The new worktree must read its index before the original goes.
+# (core.fsmonitor can name a hook command; it would run with signals ignored.)
+if ! git -C "$checkout" -c core.fsmonitor=false ls-files --stage > /dev/null; then
+    echo "$me: the new worktree can't read the copied index" >&2
+    exit 1
+fi
+rm -f -- "$gitdir/index"
+
+# Step 6: the files move into the new worktree.
+step=6
+move_entries "$stage" "$checkout"
+rmdir -- "$stage"
+step=7
+
+# Step 7: linked worktrees that lived inside the old working tree moved with
+# it; point their records at the new location. Worktrees outside need nothing.
+if [ "$#" -gt 0 ]; then
+    if git -C "$checkout" worktree repair "$@"; then
+        :
+    else
+        warn "'git worktree repair' failed; rerun it: $(repair_command "$@")"
+    fi
+fi
+
+# Step 8: the remote. A custom refspec is never overwritten. set-head may
+# wait on the network, so signals work again.
+trap 'exit 130' HUP INT TERM
+step=8
+if [ "$set_refspec" = 1 ]; then
+    git --git-dir="$gitdir" config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+    refspec_written=1
+fi
+if git --git-dir="$gitdir" config --get remote.origin.url >/dev/null; then
+    if git --git-dir="$gitdir" remote set-head origin --auto >/dev/null; then
+        :
+    else
+        warn "'git remote set-head origin --auto' failed (offline?); run it later"
+    fi
+fi
+
+# Step 9: done; let Worktrunk see it, and print where everything is.
+step=9
+trap - EXIT HUP INT TERM
+echo "Converted $top: .git is now a bare repository, and $branch is checked out in $checkout."
+if [ "$outside" -gt 0 ]; then
+    echo "Hint:     $outside linked worktree(s) outside the repo may not match the layout; preview moving them with: wt -C $(quote "$checkout") step relocate --dry-run"
+fi
+finish "$top" "$branch" "$checkout"

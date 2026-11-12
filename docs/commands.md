@@ -79,6 +79,10 @@ These commands typically only return exit codes and have no output.
 - [git-merges-cleanly](#git-merges-cleanly)
 - [git-force-checkout (planned)](#git-force-checkout-planned)
 
+## Bare-worktree commands
+
+`git clone-worktree`, `git init-worktree`, `git convert-worktree`, `git switch-worktree`, `git bare-worktree` and `git bwt` live in `bare-worktree/` and have their own docs. Start with the [bare-worktree README](https://github.com/sdthach/git-toolbelt/blob/main/bare-worktree/README.md); the full command reference is [bare-worktree/docs/usage.md](https://github.com/sdthach/git-toolbelt/blob/main/bare-worktree/docs/usage.md).
+
 ---
 
 ### git current-branch

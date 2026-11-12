@@ -8,14 +8,14 @@ Helper tools to make everyday life with Git much easier — a set of small, focu
 
 ## Prerequisites & install
 
-Requires `git` plus either [mise](https://mise.jdx.dev) or [Homebrew](https://brew.sh); a couple of commands have optional dependencies (`realpath` from GNU coreutils, `fzf`). The commands are pure POSIX `sh`, so one platform-independent build covers macOS, Linux, and WSL alike, and both package managers install that same build:
+Requires `git` plus either [mise](https://mise.jdx.dev) or [Homebrew](https://brew.sh); a few commands have optional dependencies (`realpath` from GNU coreutils, `fzf`, `wt` from Worktrunk). The commands are pure POSIX `sh`, so one platform-independent build covers macOS, Linux, and WSL alike, and both package managers install that same build:
 
 ```console
 $ mise use -g github:sdthach/git-toolbelt   # or:
 $ brew install sdthach/tap/git-toolbelt
 ```
 
-Either puts all 77 commands on `PATH` — `git-*` scripts as `git <verb>` subcommands, `g`+verb shortcuts as standalone commands. Full details, including version pinning, `--HEAD` builds, and a note for developing on this repo directly: **[docs/install.md](docs/install.md)**.
+Either puts all 83 commands on `PATH` — `git-*` scripts as `git <verb>` subcommands, `g`+verb shortcuts as standalone commands. Full details, including version pinning, `--HEAD` builds, and a note for developing on this repo directly: **[docs/install.md](docs/install.md)**.
 
 ## Layout
 
@@ -23,6 +23,7 @@ Either puts all 77 commands on `PATH` — `git-*` scripts as `git <verb>` subcom
 git-toolbelt/
 ├── git-*          # 63 standalone git subcommands (see docs/commands.md)
 ├── portmanteaus/  # 14 g+verb shortcuts: getch, gadd, gommit, gush, ... (see docs/portmanteaus.md)
+├── bare-worktree/ # 6 commands for the Worktrunk bare layout, plus samples and docs (see bare-worktree/README.md)
 ├── docs/          # install / commands / portmanteaus / maintaining-the-fork
 ├── scripts/       # build-dist.sh (release tarball) + smoke-test.sh
 ├── packaging/     # Homebrew formula, source of truth for the tap copy
@@ -30,7 +31,7 @@ git-toolbelt/
 └── CHANGELOG.md / PUBLISHING.md / LICENSE
 ```
 
-The repo layout is not the shipped layout: `git-*` stays at the root so merges from upstream stay clean, and [`scripts/build-dist.sh`](scripts/build-dist.sh) flattens both directories into the `bin/` that the release tarball carries. See [`docs/maintaining-the-fork.md`](docs/maintaining-the-fork.md).
+The repo layout is not the shipped layout: `git-*` stays at the root so merges from upstream stay clean, and [`scripts/build-dist.sh`](scripts/build-dist.sh) flattens `git-*`, `portmanteaus/` and `bare-worktree/git-*` into the `bin/` that the release tarball carries. The bare-worktree docs and sample configs go to `share/git-toolbelt/bare-worktree/`. See [`docs/maintaining-the-fork.md`](docs/maintaining-the-fork.md).
 
 ## Commands
 
@@ -141,6 +142,20 @@ Short `g`+verb executables — no `git ` prefix needed. Full reference, includin
 - [`gtash`](docs/portmanteaus.md#reference) — `git stash`
 - [`gout`](docs/portmanteaus.md#reference) — `git workon`
 - [`gome`](docs/portmanteaus.md#reference) — checkout main branch
+
+</details>
+
+<details>
+<summary><strong>Bare-worktree commands</strong></summary>
+
+Commands for the Worktrunk "bare" layout: `<repo>/.git` is a bare repository and each branch is a sibling worktree (`<repo>/main`, `<repo>/feat-x`). They need [Worktrunk](https://github.com/max-sixty/worktrunk) (`wt`). Start with [`bare-worktree/README.md`](bare-worktree/README.md); the full reference is [`bare-worktree/docs/usage.md`](bare-worktree/docs/usage.md).
+
+- [`git-clone-worktree`](bare-worktree/docs/usage.md#git-clone-worktree) — clone a remote into the layout
+- [`git-init-worktree`](bare-worktree/docs/usage.md#git-init-worktree) — start a new repo in the layout
+- [`git-convert-worktree`](bare-worktree/docs/usage.md#git-convert-worktree) — convert an existing clone in place
+- [`git-switch-worktree`](bare-worktree/docs/usage.md#git-switch-worktree) — pass everything to `wt switch`
+- [`git-bare-worktree`](bare-worktree/docs/usage.md#git-bare-worktree) — one entry point for the four above, plus `config-example`
+- [`git-bwt`](bare-worktree/docs/usage.md#git-bwt) — short alias for `git bare-worktree`
 
 </details>
 

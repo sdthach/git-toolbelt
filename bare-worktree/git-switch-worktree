@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# git switch-worktree: `wt switch` from git muscle memory.
+#
+# Every argument goes to `wt switch` unchanged (so -h shows wt's help), and
+# its output and exit status come back unchanged. Like any git subcommand it
+# can't change your shell's directory: it creates or selects the worktree and
+# wt prints where it is. Use `wt switch` (with Worktrunk's shell integration)
+# or `cd` to move there.
+set -eu
+
+if ! command -v wt >/dev/null 2>&1; then
+    cat >&2 <<'MSG'
+git switch-worktree: Worktrunk (wt) is required but was not found on PATH.
+  Install: https://github.com/max-sixty/worktrunk#install
+  Setup:   https://github.com/sdthach/git-toolbelt/blob/main/bare-worktree/docs/getting-started.md#setting-up-worktrunk
+MSG
+    exit 1
+fi
+
+exec wt switch "$@"

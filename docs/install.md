@@ -8,6 +8,7 @@ Back to the [README](../README.md).
 - **git** — required. Everything in this toolbelt is a thin wrapper around `git` plumbing/porcelain.
 - **GNU coreutils (`realpath`)** — only needed by [`git-relative-path`](commands.md#git-relative-path). Native on Linux (and therefore on WSL). On macOS: `mise use -g coreutils` or `brew install coreutils`.
 - **[`fzf`][fzf]** — optional, only used by [`git-fixup-with`](commands.md#git-fixup-with) for its interactive commit picker. `mise use -g fzf` if you want that command.
+- **[Worktrunk](https://github.com/max-sixty/worktrunk) (`wt`)** — only needed by the [bare-worktree commands](https://github.com/sdthach/git-toolbelt/blob/main/bare-worktree/README.md). Install with `mise use -g worktrunk` (recommended), `brew install worktrunk` or `cargo install worktrunk`; other options are in [Worktrunk's README](https://github.com/max-sixty/worktrunk#install). Then follow [Setting up Worktrunk](https://github.com/sdthach/git-toolbelt/blob/main/bare-worktree/docs/getting-started.md#setting-up-worktrunk).
 
 ## Install
 
@@ -26,7 +27,7 @@ That records the tool in `~/.config/mise/config.toml`:
 "github:sdthach/git-toolbelt" = "latest"
 ```
 
-All 77 commands land on `PATH` — the `git-*` scripts resolve as `git <verb>` subcommands, and the `g`+verb shortcuts as standalone commands:
+All 83 commands land on `PATH` — the `git-*` scripts resolve as `git <verb>` subcommands, and the `g`+verb shortcuts as standalone commands:
 
 ```console
 $ git main-branch
@@ -37,6 +38,8 @@ On branch main
 ```
 
 Pin a version with `mise use -g github:sdthach/git-toolbelt@2.0.0`, or drop the `-g` and run it inside a project to pin it in that project's `mise.toml`. Upgrade with `mise upgrade github:sdthach/git-toolbelt`.
+
+The bare-worktree docs and sample Worktrunk configs land in `$(mise where github:sdthach/git-toolbelt)/share/git-toolbelt/bare-worktree/`. The easier way to get a sample is `git bare-worktree config-example` (user config) or `git bare-worktree config-example --project` (project config).
 
 ### Option 2 — Homebrew
 
@@ -53,15 +56,23 @@ $ brew install --HEAD sdthach/tap/git-toolbelt
 
 You can move between them later — `brew install --HEAD …` to switch to the tip, or `brew install …` to switch back to the released version.
 
+The bare-worktree docs and sample Worktrunk configs land in `$(brew --prefix)/share/git-toolbelt/bare-worktree/`. The formula does not install Worktrunk; `brew install worktrunk` if you want the bare-worktree commands. To print a sample config, run `git bare-worktree config-example` (add `--project` for the project config).
+
 ### Why mise needs no tool options
 
 The release tarball ships its commands in a top-level `bin/` directory, which is exactly what mise's github backend looks for when no `bin_path` is set. Releases also carry a `.sha256` asset that mise matches by name and verifies automatically, plus GitHub build-provenance attestations. If GitHub's attestation service is ever down and blocks an install, the escape hatch is `github_attestations = false` on the tool.
 
-The Homebrew formula points its `url` at that same tarball and installs the same `bin/`, so the two paths cannot drift apart — there is one artifact and one `sha256` per release.
+The Homebrew formula points its `url` at that same tarball and installs the same `bin/` (and the same `share/` files), so the two paths cannot drift apart — there is one artifact and one `sha256` per release.
 
 ## Developing on this repo
 
-If you're working *inside a clone of this repo* rather than installing it, the checked-in [`mise.toml`](../mise.toml) puts the repo root and `portmanteaus/` on `PATH`, so the scripts resolve without installing anything, and it defines the lint/build/test tasks:
+### Standalone bare-worktree install
+
+The six bare-worktree scripts can be installed without the rest of the toolbelt. See [Standalone install](https://github.com/sdthach/git-toolbelt/blob/main/bare-worktree/docs/usage.md#standalone-install).
+
+### Toolbelt development environment
+
+If you're working *inside a clone of this repo* rather than installing it, the checked-in [`mise.toml`](../mise.toml) puts the repo root, `portmanteaus/` and `bare-worktree/` on `PATH`, so the scripts resolve without installing anything, and it defines the lint/build/test tasks:
 
 ```console
 $ mise trust        # once, after cloning

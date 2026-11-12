@@ -22,7 +22,7 @@ mise's github backend installs release **assets**. GitHub's auto-generated "Sour
 
 ### Ship a built tarball, keep the repo layout
 
-The upstream `git-*` scripts stay at the repo root, byte-identical to `nvie/git-toolbelt`, so the weekly upstream merge has nothing to reconcile. The shipped layout is different: [`scripts/build-dist.sh`](../scripts/build-dist.sh) flattens the root scripts and `portmanteaus/` into a single `bin/`.
+The upstream `git-*` scripts stay at the repo root, byte-identical to `nvie/git-toolbelt`, so the weekly upstream merge has nothing to reconcile. The shipped layout is different: [`scripts/build-dist.sh`](../scripts/build-dist.sh) flattens the root scripts, `portmanteaus/` and `bare-worktree/git-*` into a single `bin/`, and puts the bare-worktree README, `docs/*.md` and config samples under `share/git-toolbelt/bare-worktree/` (its `docs/plans/` stays in the repo). `bare-worktree/` is fork-only, like `portmanteaus/`.
 
 Moving the scripts into `bin/` in the repo would have been tidier, at the cost of making every upstream merge depend on rename detection. Assembling at release time buys the clean archive without the repo paying for it.
 
@@ -31,14 +31,14 @@ Three properties make the result install with **zero mise tool options**, each v
 | Property | Why it matters |
 |---|---|
 | `bin/` at the archive root | With no `bin_path` set, mise uses `<install_path>/bin` when it exists |
-| Two root directories plus files | mise auto-applies `strip_components = 1` only for a single root directory with no files; this shape prevents that |
+| Several root directories (`bin/`, `docs/`, `share/`) plus files | mise auto-applies `strip_components = 1` only for a single root directory with no files; this shape prevents that |
 | Named `git-toolbelt-<version>.tar.gz` | Scores +10 (archive) +20 (repo-name match) = 30; anything scoring ≤ 0 is discarded. No OS/arch token means the one noarch build wins everywhere |
 
 A `.tar.gz.sha256` asset rides along — mise matches that exact name and verifies it, and the `.sha256` extension is penalized in scoring so it can never be selected as the tool itself.
 
 ### Both package managers, one artifact
 
-Homebrew was kept rather than replaced, with the formula's `url` pointed at the same release asset. `def install` is `bin.install Dir["bin/*"]`, with a fallback to the repo layout for `--HEAD` builds. One tarball and one checksum serve both paths, so a bug in one is a bug in both.
+Homebrew was kept rather than replaced, with the formula's `url` pointed at the same release asset. `def install` is `bin.install Dir["bin/*"]` plus `pkgshare.install` of `share/git-toolbelt/bare-worktree`, with a fallback to the repo layout for `--HEAD` builds. One tarball and one checksum serve both paths, so a bug in one is a bug in both.
 
 The tap copy is now replaced **wholesale** from `packaging/git-toolbelt.rb` on each release, with only `url`/`sha256` rewritten. The previous patch-in-place approach let the tap accumulate two commits — a test-block fix and a version pin — that never made it back here.
 
@@ -126,7 +126,7 @@ $ mise install
 git main-branch -> main      git toolbelt --version -> 2.0.0
 ```
 
-CI asserts the shape on every push: [`scripts/smoke-test.sh`](../scripts/smoke-test.sh) builds the tarball, extracts it, checks for the top-level `bin/`, runs commands off it, confirms the stamped version round-trips, and fails if any shipped command has lost its exec bit or shebang.
+CI asserts the shape on every push: [`scripts/smoke-test.sh`](../scripts/smoke-test.sh) builds the tarball, extracts it, checks for the top-level `bin/` and the `share/` docs and samples, runs commands off it, confirms the stamped version round-trips, and fails if any shipped command has lost its exec bit or shebang.
 
 ## Still open
 

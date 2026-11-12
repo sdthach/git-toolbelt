@@ -1,0 +1,31 @@
+# Worktrunk PROJECT config sample (git-toolbelt bare-worktree).
+#
+# Save it as .config/wt.toml inside a worktree and commit it: it is shared
+# with everyone who works on the repo. In the bare layout wt reads it from the
+# current worktree (from the <repo> folder itself it reads the default
+# branch's copy), and because the file is tracked, every branch carries its
+# own copy.
+#
+# Create it with `wt config create --project`, or start from this sample:
+#   mkdir -p .config && git bare-worktree config-example --project > .config/wt.toml
+#
+# There is no worktree-path here: the layout is a personal choice and lives
+# in your user config (git bare-worktree config-example).
+#
+# Project hooks ask for approval the first time they run, and again whenever
+# they change.
+
+# Hooks. pre-start blocks until done, right after a worktree is created.
+# pre-start = "mise trust"
+
+# Keep every top-level key above this line: a key placed after a [table]
+# header belongs to that table.
+
+# Dev-server URL column in `wt list` (dimmed when the port isn't listening).
+# [list]
+# url = "http://localhost:{{ branch | hash_port }}"
+
+# Extra excludes for `wt step copy-ignored`. Built-in excludes (VCS metadata
+# and tool state) always apply; these add to the ones in your user config.
+# [step.copy-ignored]
+# exclude = [".cache/", ".turbo/"]
