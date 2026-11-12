@@ -10,7 +10,7 @@ This is a personal fork of [`nvie/git-toolbelt`](https://github.com/nvie/git-too
 
 ```
 git-toolbelt/                 # fork: github.com/sdthach/git-toolbelt
-├── git-*  (62 upstream)      # UNTOUCHED, at the root, on purpose
+├── git-*  (60 upstream)      # UNTOUCHED, at the root, on purpose
 ├── git-toolbelt              # fork-only: identifies which build is installed
 ├── portmanteaus/             # getch gull gulp gush gadd gommit gamend
 │   └── gatus giff glog granch gtash gout gome
@@ -124,7 +124,7 @@ Three workflows live in `.github/workflows/`:
 
   > **Job names are load-bearing.** Branch protection on `main` requires the status check named `shellcheck`. A required check that never reports is never satisfied, so renaming that job silently blocks every future PR — including release-please's release PR. Update the branch protection rule before renaming.
 
-- **`upstream-sync.yml`** — weekly cron + manual `workflow_dispatch`. Pushes `upstream/main`'s tip to an `upstream-sync/<date>` branch and opens a PR into `main` (never an auto-merge — conflicts with fork-only files surface in the PR for review).
+- **`upstream-sync.yml`** — weekly cron + manual `workflow_dispatch`. Counts upstream commits after the one recorded in [`.upstream-sync-base`](../.upstream-sync-base), and does nothing if there are none or a sync PR is already open. Otherwise it opens a PR from an `upstream-sync/<upstream-sha>` branch: when upstream merges cleanly, the branch holds the squashed sync plus the updated `.upstream-sync-base`; when it conflicts, the branch is upstream's tip for review only, and the sync is done by hand (below). Never an auto-merge.
 - **`release.yml`** — on every push to `main`. Runs release-please, which maintains the release PR; when that PR merges, the same run builds the tarball and its `.sha256`, attests build provenance, attaches both to the release release-please just created, and bumps the tap formula. Only the tap bump needs a secret (`TAP_TOKEN`), and it skips gracefully without one.
 
 ## Review policy
@@ -137,16 +137,22 @@ Since GitHub does not let anyone approve their own pull request, the sole mainta
 
 ## Syncing from upstream
 
-The `upstream-sync` workflow automates this weekly, but you can also do it by hand:
+`main` requires linear history and verified signatures, and upstream's commits are mostly unsigned. So a sync never merges upstream's history: it lands as **one squash commit**, and [`.upstream-sync-base`](../.upstream-sync-base) records which upstream commit it brought in. Without that file, `git rev-list origin/main..upstream/main` would keep counting the same upstream commits after every sync, and the workflow would open a duplicate PR every week (it did, nine times, in 2026).
+
+The workflow does clean syncs on its own. When it reports conflicts, sync by hand:
 
 ```console
 $ git fetch upstream
-$ git checkout main
-$ git merge upstream/main
-$ git push origin main
+$ git switch -c chore/upstream-sync-<sha> origin/main
+$ git merge --squash upstream/main      # resolve any conflicts
+$ git rev-parse upstream/main > .upstream-sync-base
+$ git add -A && git commit -S -m "feat: sync upstream nvie/git-toolbelt to <sha>"
+$ git push -u origin HEAD                # open a PR, squash-merge it, close the review-only PR
 ```
 
-Because the upstream `git-*` scripts are never modified — and never moved — in this fork, these merges stay fast-forward or conflict-free in the common case. Conflicts would only arise if a fork-only file (docs, portmanteaus, bare-worktree, scripts) happens to collide with an upstream rename, which is unlikely given the additive-only approach.
+Use `fix:` if the sync is fixes only, and `feat!:` if upstream removed or renamed commands. When resolving: take upstream's version of any root `git-*` script, keep the fork's `README.md` (it is the fork's index; port upstream's command-doc changes into [`docs/commands.md`](commands.md)), and update the command counts in `README.md`, `docs/install.md`, `packaging/git-toolbelt.rb` and the layout tree above.
+
+Because the upstream `git-*` scripts are never modified — and never moved — in this fork, these merges stay conflict-free in the common case. Conflicts come from fork-only files that upstream also touches (`README.md`, `.envrc`), or from a root script the fork changed anyway (`git-modified` once did, and that change was dropped for upstream's fix in the 2026-11 sync).
 
 If upstream adds a new `git-*` command, it needs no packaging work: `build-dist.sh` globs `git-*`, so it ships automatically. It does deserve an entry in [`docs/commands.md`](commands.md) and the README index.
 

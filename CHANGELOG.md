@@ -46,6 +46,17 @@
 
 - `git-push-current` now honors and supports a differently-named upstream
   branch when one is set. You can also setup one with `-u <remote-branch>`
+- `git-modified` no longer needs the `rev` utility, which does not exist in Git
+  Bash on Windows (thanks @ernstki!)
+- Fix: `git-modified` no longer garbles or silently drops files whose names
+  contain non-ASCII characters
+- Fix: `git-commit-to` no longer discards unstaged changes to tracked files
+  after moving the commit to the other branch
+- Fix: `git-cherry-pick-to` no longer pops (and drops!) an unrelated stash
+  entry when there was nothing to stash, and restores staged changes as staged
+- Asking for help is no longer an error: `-h` now prints to stdout and exits 0,
+  so `git <cmd> -h | less` works without redirecting stderr (thanks @ernstki!)
+- Various security fixes
 
 ## v1.11.0
 

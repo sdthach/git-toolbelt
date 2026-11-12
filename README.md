@@ -15,13 +15,13 @@ $ mise use -g github:sdthach/git-toolbelt   # or:
 $ brew install sdthach/tap/git-toolbelt
 ```
 
-Either puts all 83 commands on `PATH` — `git-*` scripts as `git <verb>` subcommands, `g`+verb shortcuts as standalone commands. Full details, including version pinning, `--HEAD` builds, and a note for developing on this repo directly: **[docs/install.md](docs/install.md)**.
+Either puts all 81 commands on `PATH` — `git-*` scripts as `git <verb>` subcommands, `g`+verb shortcuts as standalone commands. Full details, including version pinning, `--HEAD` builds, and a note for developing on this repo directly: **[docs/install.md](docs/install.md)**.
 
 ## Layout
 
 ```
 git-toolbelt/
-├── git-*          # 63 standalone git subcommands (see docs/commands.md)
+├── git-*          # 61 standalone git subcommands (see docs/commands.md)
 ├── portmanteaus/  # 14 g+verb shortcuts: getch, gadd, gommit, gush, ... (see docs/portmanteaus.md)
 ├── bare-worktree/ # 6 commands for the Worktrunk bare layout, plus samples and docs (see bare-worktree/README.md)
 ├── docs/          # install / commands / portmanteaus / maintaining-the-fork
@@ -46,7 +46,6 @@ Not sure whose git-toolbelt is on your `PATH`? [`git-toolbelt`](docs/commands.md
 - [`git-current-branch`](docs/commands.md#git-current-branch) — print the current branch name
 - [`git-main-branch`](docs/commands.md#git-main-branch) — print the repo's default main branch (`main`/`master`)
 - ⭐️ [`git-fixup`](docs/commands.md#git-fixup) — amend staged changes into the last commit
-- [`git-autofixup`](docs/commands.md#git-autofixup) — auto-target `git commit --fixup` at the commit that last touched your staged files
 - ⭐️ [`git-fixup-with`](docs/commands.md#git-fixup-with) — pick a commit to fix up via `fzf`
 - ⭐️ [`git-active-branches`](docs/commands.md#git-local-branches--git-remote-branches--git-active-branches) — branches with recent activity
 - ⭐️ [`git-diff-since`](docs/commands.md#git-diff-since) — diff current branch against main
@@ -66,7 +65,6 @@ Not sure whose git-toolbelt is on your `PATH`? [`git-toolbelt`](docs/commands.md
 - [`git-workon`](docs/commands.md#git-workon) — switch to (or create-and-track) a branch by name
 - ⭐️ [`git-modified`](docs/commands.md#git-modified) — list locally modified files
 - ⭐️ [`git-modified-since`](docs/commands.md#git-modified-since) — list files modified since branching off main
-- [`git-last-commit-to-file`](docs/commands.md#git-last-commit-to-file) — SHA of the commit that last touched a file
 - ⭐️ [`git-separator`](docs/commands.md#git-separator) — add a visual `---` separator commit
 - ⭐️ [`git-spinoff`](docs/commands.md#git-spinoff) — spin the current branch's unpushed work onto a new branch
 - ⭐️ [`git-wip`](docs/commands.md#git-wip) — quick "WIP" savepoint commit(s)

@@ -2,13 +2,16 @@
 set -e
 
 usage () {
-    echo "git remote-branches [<remote>]"
+    cat <<'EOF'
+git remote-branches [<remote>]
+EOF
 }
 
 remote_branches () {
-    git branch --remotes --no-color \
-        | grep -v ' -> ' \
-        | cut -c3-
+    # The `$2 == ""` filter drops symbolic refs (e.g. origin/HEAD), whose
+    # %(symref) field is non-empty; real branches have an empty second field.
+    git for-each-ref --format='%(refname:short) %(symref)' refs/remotes/ \
+        | awk '$2 == "" { print $1 }'
 }
 
 if [ $# -eq 1 ]; then
@@ -16,6 +19,6 @@ if [ $# -eq 1 ]; then
 elif [ $# -eq 0 ]; then
     remote_branches
 else
-    usage
+    usage >&2
     exit 2
 fi

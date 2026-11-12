@@ -2,11 +2,13 @@
 set -e
 
 usage () {
-    echo "usage: git cherry-pick-to <branch> ..." >&2
+    cat <<'EOF'
+usage: git cherry-pick-to <branch> ...
+EOF
 }
 
 if [ $# -eq 0 ]; then
-    usage
+    usage >&2
     exit 2
 fi
 
@@ -21,10 +23,24 @@ fi
 # TODO: FIXME: There is a lot that can go wrong here.  Basically, that's not
 # a problem at all in itself, but we need a mechanism to reliably recover back
 # to the starting position.
-git stash-everything
+
+# Only stash when there is something to stash.  On a clean worktree, `git
+# stash push` saves nothing, and a blind `git stash pop` afterwards would
+# restore (and drop!) an unrelated, pre-existing stash entry.
+stashed=0
+if git is-dirty -iw; then
+    git stash-everything
+    stashed=1
+fi
+
 commit=$(git sha HEAD)
 orig_branch=$(git current-branch)
 git checkout "$branch"
 git cherry-pick "$commit"
 git checkout "$orig_branch"
-git stash pop
+
+if [ $stashed -eq 1 ]; then
+    # `--index` so staged changes come back staged, instead of getting mixed
+    # in with the unstaged ones.
+    git stash pop --index
+fi
