@@ -2,24 +2,29 @@
 set -e
 
 root="$(git root)"
-realpath_bin="$(which grealpath realpath 2>/dev/null | head -n1 || true)"
+# Use the first realpath that supports --relative-to (GNU coreutils does, and
+# so does uutils, but the BSD one on macOS doesn't)
+realpath_bin=""
+for candidate in grealpath realpath; do
+    if "$candidate" --relative-to=. . >/dev/null 2>&1; then
+        realpath_bin="$candidate"
+        break
+    fi
+done
 
-if [ ! -x "$realpath_bin" ]; then
-    echo "'realpath' or 'grealpath' utility not found. Please install GNU coreutils." >&2
+if [ -z "$realpath_bin" ]; then
+    echo "No 'realpath' that supports --relative-to found (tried grealpath, realpath). Please install GNU coreutils." >&2
     exit 1
 fi
 
-# Probe for the one feature this script needs instead of checking for the GNU
-# version: BSD realpath lacks --relative-to, while GNU and uutils coreutils
-# (the default on recent Ubuntu) both support it.
-if [ "$("$realpath_bin" --relative-to=. . 2>/dev/null)" != "." ]; then
-    echo "I expected a 'realpath' utility that supports --relative-to." >&2
-    echo "$realpath_bin: does not support --relative-to" >&2
-    echo "Please install GNU coreutils and try again." >&2
-    exit 2
-fi
-
 while [ $# -gt 0 ]; do
-    "$realpath_bin" --relative-to=. "$root/$1"
+    path="$("$realpath_bin" --relative-to=. "$root/$1")"
+
+    # Keep names like "-rf" or "+cmd" from being parsed as options or
+    # commands when the output is passed on a command line.
+    case "$path" in
+        -*|+*) path="./$path";;
+    esac
+    printf '%s\n' "$path"
     shift
 done

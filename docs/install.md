@@ -85,6 +85,18 @@ $ mise run ci       # everything CI runs: lint + smoke test
 `mise run setup` configures things that live in `.git/config` and therefore can't
 travel with a clone — see [maintaining-the-fork](maintaining-the-fork.md#remotes).
 
+### Upstream's test suite
+
+Upstream's own scripts have a [bats](https://github.com/bats-core/bats-core) suite in `test/`, run with `make test` (`test/run`). It runs in a sandbox that only allows writes inside a throwaway directory and blocks the network: `sandbox-exec` on macOS, bubblewrap (`bwrap`) on Linux. It refuses to run if the sandbox doesn't work.
+
+```console
+$ brew install bats-core coreutils      # macOS
+$ sudo apt install bats bubblewrap      # Linux (or: mise use -g bats)
+$ make test
+```
+
+On Ubuntu, AppArmor blocks the unprivileged user namespaces bwrap needs (`kernel.apparmor_restrict_unprivileged_userns=1`), so `make test` reports that it can't set up the sandbox. CI turns that off on its throwaway runners (`.github/workflows/test.yml`), and the suite runs there on Linux and macOS for every PR.
+
 The upstream `Makefile` (`make link` / `make unlink`) also works in a clone, but it only symlinks the root `git-*` scripts into `~/.local/bin` or `~/bin`. It does not link `portmanteaus/` or `bare-worktree/`, so use the mise environment above (or a package install) to get all of them.
 
 `direnv` users get the same environment via the checked-in `.envrc` (`direnv allow` once) — it delegates to mise rather than duplicating the `PATH` list.

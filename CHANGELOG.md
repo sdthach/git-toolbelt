@@ -65,12 +65,6 @@
   Bash on Windows (thanks @ernstki!)
 - Fix: `git-modified` no longer garbles or silently drops files whose names
   contain non-ASCII characters
-- Fix: `git-modified` no longer garbles or silently drops files whose names
-  contain a space, a backslash, a double quote, a tab or ` -> `. Names that
-  contain a newline can't be listed one per line, so they are skipped with a
-  warning
-- Fix: `git-modified -u` now also lists files that were added on both sides
-  (add/add conflicts)
 - Fix: `git-commit-to` no longer discards unstaged changes to tracked files
   after moving the commit to the other branch
 - Fix: `git-cherry-pick-to` no longer pops (and drops!) an unrelated stash
@@ -78,8 +72,6 @@
 - Asking for help is no longer an error: `-h` now prints to stdout and exits 0,
   so `git <cmd> -h | less` works without redirecting stderr (thanks @ernstki!)
 - Various security fixes
-- Fix: `git-relative-path` (and so `git-modified`) accepts any `realpath` that
-  supports `--relative-to`, such as uutils coreutils, instead of requiring GNU
 
 ## v1.11.0
 
