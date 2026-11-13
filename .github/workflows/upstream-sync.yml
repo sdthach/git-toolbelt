@@ -19,6 +19,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
   sync:
@@ -56,12 +57,14 @@ jobs:
           fi
           echo "upstream has $ahead commit(s) after $base."
 
-          # One sync PR at a time: an open one already carries these commits,
-          # or an older subset of them that its reviewer can refresh.
+          # One sync at a time: an open sync PR, or an open issue asking for a
+          # manual sync, already covers these commits (or an older subset).
           open="$(gh pr list --state open --json headRefName \
             --jq '[.[] | select(.headRefName | startswith("upstream-sync/"))] | length')"
-          if [ "$open" -gt 0 ]; then
-            echo "A sync PR is already open; not opening another."
+          issues="$(gh issue list --state open --search 'in:title "upstream sync:"' \
+            --json title --jq '[.[] | select(.title | startswith("upstream sync:"))] | length')"
+          if [ "$open" -gt 0 ] || [ "$issues" -gt 0 ]; then
+            echo "A sync PR or manual-sync issue is already open; not opening another."
             exit 0
           fi
 
@@ -77,31 +80,45 @@ jobs:
           git switch --quiet -c "$branch" origin/main
 
           title="feat: sync upstream nvie/git-toolbelt to ${tip:0:7} ($ahead commit(s))"
-          if git merge --squash --quiet upstream/main >/dev/null 2>&1; then
-            # Clean: commit the squashed sync together with the new base.
+          # Apply only upstream's commits since the last sync. A plain
+          # `git merge --squash upstream/main` would replay everything since
+          # the fork point (squashed syncs never make upstream an ancestor of
+          # main) and report conflicts on changes an earlier sync brought in.
+          # README.md is the fork's own index: upstream's README changes are
+          # ported into docs/commands.md by hand, so they are left out of the
+          # patch and flagged in the PR instead of causing a conflict.
+          readme="$(git diff --stat "$base" upstream/main -- README.md)"
+          if git diff --binary "$base" upstream/main -- . ':(exclude)README.md' \
+              | git apply --3way --index >/dev/null 2>&1; then
+            # Clean: commit the sync together with the new base.
             printf '%s\n' "$tip" > .upstream-sync-base
             git add .upstream-sync-base
             git commit --quiet -m "$title"
             git push --quiet origin "$branch"
-            body="Automated weekly sync: upstream/main squashed onto main, plus"
-            body="$body \`.upstream-sync-base\` set to \`$tip\`."
+            body="Automated weekly sync: upstream's commits since \`$base\` applied onto main,"
+            body="$body plus \`.upstream-sync-base\` set to \`$tip\`."
             body="$body\n\n**Squash-merge this PR** so release-please sees one classified subject."
             body="$body Retitle to \`fix:\` if the sync is fixes only, or \`feat!:\` if upstream"
             body="$body removed or renamed commands."
+            if [ -n "$readme" ]; then
+              body="$body\n\n**upstream changed README.md**, which this PR leaves out. Port the"
+              body="$body change into docs/commands.md: \`git diff $base $tip -- README.md\`"
+            fi
+            gh pr create --base main --head "$branch" \
+              --title "$title" \
+              --body "$(printf '%b' "$body")"
           else
-            # Conflicts: show upstream's tip for review; the sync itself has
-            # to be done by hand (docs/maintaining-the-fork.md).
+            # Conflicts with the fork: nothing to push. Open one issue that
+            # lists the commits and the conflicting files; the sync is done
+            # by hand (docs/maintaining-the-fork.md#syncing-from-upstream).
+            conflicts="$(git diff --name-only --diff-filter=U | sed 's/^/- `/; s/$/`/')"
             git reset --quiet --hard origin/main
-            git push --quiet origin "upstream/main:refs/heads/$branch"
-            body="Automated weekly sync. upstream/main does **not** merge cleanly into main,"
-            body="$body so this PR shows upstream's tip for review only. Do not merge it."
-            body="$body\n\nTo sync: branch off main, run \`git merge --squash upstream/main\`,"
-            body="$body resolve the conflicts, write \`$tip\` to \`.upstream-sync-base\`,"
-            body="$body commit (signed), open a PR, squash-merge it, then close this one."
-            body="$body See docs/maintaining-the-fork.md#syncing-from-upstream."
-            title="$title — conflicts, sync by hand"
+            commits="$(git log --format='- %h %s' "$base..upstream/main")"
+            body="upstream has $ahead commit(s) since \`$base\` that don't apply cleanly to main."
+            body="$body\n\nConflicting files:\n${conflicts:-- (see a local run)}"
+            body="$body\n\nCommits:\n$commits"
+            body="$body\n\nSync by hand: docs/maintaining-the-fork.md#syncing-from-upstream."
+            body="$body Close this issue when the sync PR merges."
+            gh issue create --title "upstream sync: ${tip:0:7} needs a manual sync ($ahead commit(s))" \
+              --body "$(printf '%b' "$body")"
           fi
-
-          gh pr create --base main --head "$branch" \
-            --title "$title" \
-            --body "$(printf '%b' "$body")"
