@@ -20,10 +20,10 @@ git-toolbelt/                 # fork: github.com/sdthach/git-toolbelt
 ├── scripts/
 │   ├── build-dist.sh         # assembles the release tarball
 │   ├── smoke-test.sh         # builds it and exercises it like an install
-│   ├── test-bare-worktree.sh # end-to-end tests for bare-worktree/ (run by smoke)
-│   └── test-git-modified.sh  # git-modified against upstream's 354262e (run by smoke)
+│   └── test-bare-worktree.sh # end-to-end tests for bare-worktree/ (run by smoke)
 ├── packaging/git-toolbelt.rb # brew formula source of truth
-├── .github/workflows/        # ci / upstream-sync / release
+├── test/                     # sandboxed script and fork sync-workflow tests
+├── .github/workflows/        # ci / Test / upstream-sync / release
 ├── mise.toml                 # dev PATH + tools + lint/build/smoke/ci tasks
 ├── .envrc                    # direnv shim; delegates to mise
 ├── version.txt               # bumped by release-please
@@ -46,7 +46,7 @@ They are deliberately different:
 | bare-worktree commands | `bare-worktree/git-clone-worktree`, … | `bin/git-clone-worktree`, … |
 | bare-worktree docs and samples | `bare-worktree/README.md`, `bare-worktree/docs/*.md`, `bare-worktree/*.example` | `share/git-toolbelt/bare-worktree/…` |
 
-Keeping `git-*` at the root is what makes the weekly upstream sync a no-op merge — upstream touches `git-cleanup`, this fork has `git-cleanup` at the same path, and git has nothing to reconcile. Moving them into `bin/` would make every upstream merge depend on rename detection.
+Keeping `git-*` at the root lets the weekly sync apply upstream changes at their existing paths. Temporary fixes can still conflict with upstream edits to the same code. Moving the scripts into `bin/` would make every sync depend on rename detection.
 
 The flattening happens instead in [`scripts/build-dist.sh`](../scripts/build-dist.sh) at release time, so the shipped archive gets the single `bin/` directory that installers want without the repo paying for it. Only `bare-worktree/git-*` goes into `bin/`; the folder's README, `docs/*.md` and `.example` files go to `share/git-toolbelt/bare-worktree/`, and its `docs/plans/` is repo-only and not shipped.
 
@@ -116,16 +116,17 @@ Commits that GitHub itself creates — squash merges, and release-please's chang
 
 ## CI/CD (GitHub Actions)
 
-Three workflows live in `.github/workflows/`:
+Four workflows live in `.github/workflows/`:
 
 - **`ci.yml`** — on every push/PR. Three jobs, each running one mise task, so a failure names itself in the checks list. They are the same tasks `mise run ci` runs locally, so CI and local can't drift:
   - `shellcheck` — full severity for the fork's own scripts (`portmanteaus/*`, `bare-worktree/git-*`, `scripts/*.sh`, `git-toolbelt`), `--severity=error` for the upstream `git-*` scripts, which carry pre-existing style/info/warning findings we deliberately don't "fix" so upstream merges stay clean.
   - `yamllint` — the workflows, tuned by `.yamllint`.
-  - `smoke` — builds the release tarball, extracts it, and runs commands off its `bin/`, checking the archive shape (including the `share/git-toolbelt/bare-worktree/` docs and samples) and that every shipped command is executable, then runs `scripts/test-bare-worktree.sh` and `scripts/test-git-modified.sh`. The latter compares `git-modified` with upstream's version from this repository's history, so the job checks out with `fetch-depth: 0`. This is what stops a broken release reaching users.
+  - `smoke` — builds the release tarball, extracts it, and runs commands off its `bin/`, checking the archive shape (including the `share/git-toolbelt/bare-worktree/` docs and samples) and that every shipped command is executable, then runs `scripts/test-bare-worktree.sh`. The retired `scripts/test-git-modified.sh` is no longer run, and this job does not need full Git history.
 
   > **Job names are load-bearing.** Branch protection on `main` requires the status check named `shellcheck`. A required check that never reports is never satisfied, so renaming that job silently blocks every future PR — including release-please's release PR. Update the branch protection rule before renaming.
 
-- **`upstream-sync.yml`** — weekly cron + manual `workflow_dispatch`. Counts upstream commits after the one recorded in [`.upstream-sync-base`](../.upstream-sync-base), and does nothing if there are none or a sync PR is already open. Otherwise it opens a PR from an `upstream-sync/<upstream-sha>` branch: when upstream merges cleanly, the branch holds the squashed sync plus the updated `.upstream-sync-base`; when it conflicts, the branch is upstream's tip for review only, and the sync is done by hand (below). Never an auto-merge.
+- **`test.yml`** — runs `make test` on Linux and macOS for PRs and pushes to `main`. It covers upstream scripts, the fork's filename/conflict regression tests, and the sync workflow's behavior with Issues enabled or disabled. GitHub calls in the workflow tests are stubbed; the tests do not create remote PRs or issues. Run this suite separately from `mise run ci`, using the dependencies in [install.md](install.md#upstreams-test-suite).
+- **`upstream-sync.yml`** — Mondays at 06:00 UTC + manual `workflow_dispatch`. Counts upstream commits after the one recorded in [`.upstream-sync-base`](../.upstream-sync-base), and does nothing if there are none, a PR from `upstream-sync/…` or `chore/upstream-sync-…` is open, or an `upstream sync: …` issue is open. Otherwise it applies only upstream's changes since that base onto `main`, leaving out the fork's README. A clean application opens a PR containing the changes and the updated base. Conflicts push nothing: if Issues are enabled, the workflow opens a manual-sync issue; if they are disabled (as on this fork), it fails the run and puts the conflicting files, commits, and manual-sync instructions in the run summary. The next run retries when no sync PR or issue is open. Never an auto-merge.
 - **`release.yml`** — on every push to `main`. Runs release-please, which maintains the release PR; when that PR merges, the same run builds the tarball and its `.sha256`, attests build provenance, attaches both to the release release-please just created, and bumps the tap formula. Only the tap bump needs a secret (`TAP_TOKEN`), and it skips gracefully without one.
 
 ## Review policy
@@ -140,20 +141,29 @@ Since GitHub does not let anyone approve their own pull request, the sole mainta
 
 `main` requires linear history and verified signatures, and upstream's commits are mostly unsigned. So a sync never merges upstream's history: it lands as **one squash commit**, and [`.upstream-sync-base`](../.upstream-sync-base) records which upstream commit it brought in. Without that file, `git rev-list origin/main..upstream/main` would keep counting the same upstream commits after every sync, and the workflow would open a duplicate PR every week (it did, nine times, in 2026).
 
-The workflow does clean syncs on its own. When it reports conflicts, sync by hand:
+The workflow prepares clean sync PRs; a maintainer still reviews them and resolves signing requirements before merging. When it reports conflicts, sync by hand:
 
 ```console
-$ git fetch upstream
-$ git switch -c chore/upstream-sync-<sha> origin/main
-$ git merge --squash upstream/main      # resolve any conflicts
-$ git rev-parse upstream/main > .upstream-sync-base
+$ git fetch origin main
+$ git fetch upstream main
+$ git switch -c upstream-sync/manual-<sha> origin/main
+$ base="$(cat .upstream-sync-base)"
+$ tip="$(git rev-parse upstream/main)"
+$ git diff --binary "$base" "$tip" -- . ':(exclude)README.md' \
+    | git apply --3way --index --allow-empty
+$ # resolve any conflicts (git status shows them as unmerged)
+$ git diff "$base" "$tip" -- README.md
+$ # port relevant README changes into docs/commands.md or docs/install.md
+$ printf '%s\n' "$tip" > .upstream-sync-base
 $ git add -A && git commit -S -m "feat: sync upstream nvie/git-toolbelt to <sha>"
-$ git push -u origin HEAD                # open a PR, squash-merge it, close the review-only PR
+$ git push -u origin HEAD                # open a PR; close any manual-sync issue after merging
 ```
 
-Use `fix:` if the sync is fixes only, and `feat!:` if upstream removed or renamed commands. When resolving: take upstream's version of any root `git-*` script, keep the fork's `README.md` (it is the fork's index; port upstream's command-doc changes into [`docs/commands.md`](commands.md)), and update the command counts in `README.md`, `docs/install.md`, `packaging/git-toolbelt.rb` and the layout tree above.
+Apply only upstream's changes since the saved `$base`, and leave out `README.md`: port upstream's README changes into [`docs/commands.md`](commands.md) or [`docs/install.md`](install.md) before advancing `.upstream-sync-base`. `--allow-empty` handles updates that only change the excluded README; the automated PR flags those changes for porting. Don't use `git merge --squash upstream/main`: because syncs are squashed, git still thinks the fork and upstream last met at `9d8a133`. It would replay every upstream change since then, and report conflicts on files an earlier sync already brought in (the 2026-11-13 sync hit this with `Makefile`, `CHANGELOG.md` and `.envrc`).
 
-Because the upstream `git-*` scripts are not modified in this fork, apart from the [temporary divergences](#temporary-divergences-from-upstream) below, and never moved, these merges stay conflict-free in the common case. Conflicts come from fork-only files that upstream also touches (`README.md`, `.envrc`), or from a root script the fork changed anyway (`git-modified` did before the 2026-11 sync, which dropped that change for upstream's fix, and does again now).
+Use `fix:` if the sync is fixes only, and `feat!:` if upstream removed or renamed commands. When resolving, prefer upstream's root `git-*` scripts except for the [temporary divergences](#temporary-divergences-from-upstream): keep those guards until upstream covers the same cases and their regression tests pass. Keep the fork's `README.md`, port relevant upstream documentation into `docs/`, and update command counts when commands are added or removed.
+
+Squashing does not prevent future upstream updates: `.upstream-sync-base` records which upstream changes were already applied. Future changes are applied with a three-way merge, so unrelated edits can retain the fork's fixes. Edits to the same code may require manual resolution. The excluded README is always reviewed separately.
 
 If upstream adds a new `git-*` command, it needs no packaging work: `build-dist.sh` globs `git-*`, so it ships automatically. It does deserve an entry in [`docs/commands.md`](commands.md) and the README index.
 
@@ -161,13 +171,10 @@ If upstream adds a new `git-*` command, it needs no packaging work: `build-dist.
 
 A root `git-*` script is changed here only to carry a fix that has been offered upstream, and only until upstream has it. Each one is listed here, so the sync that brings in upstream's fix knows to drop it.
 
-- **`git-modified`.** Filenames that git quotes (a space, a backslash, a double quote, a tab or ` -> ` in the name) were printed with git's quotes and escapes, or silently dropped with `<commit>`; a name with a newline could garble the entries after it; and `-u` missed add/add (`AA`) conflicts. The fork carries the two commits from the `upstream-fix/git-modified-paths` branch, which is based on upstream's `354262e` and holds nothing but `git-modified` and upstream's `CHANGELOG.md`: "Handle filenames that git quotes in `git-modified`" and "Include add/add conflicts in `git modified -u`". [`scripts/test-git-modified.sh`](../scripts/test-git-modified.sh) checks the result against upstream's `354262e` version.
+- **`git-modified`.** Preserve the newline-filename guard and include add/add (`AA`) conflicts in `-u` and `-uq`. Upstream's `a484804` still splits newline-containing names into fake status records and misses `AA` conflicts. Keep these fixes until upstream handles both cases; `test/git-modified.bats` covers them.
+- **`git-modified-since`.** Skip newline-containing names with a warning (silently with `-q`) instead of splitting them into separate paths. `test/git-modified-since.bats` covers the same guard for branch comparisons.
 
-  Drop it at the first sync after upstream has the fix: take upstream's `git-modified` and `CHANGELOG.md` lines, even where upstream's version differs from the fork's, delete this entry, and bring `scripts/test-git-modified.sh` in line with upstream's behaviour where it differs. Until then, a sync that touches `git-modified` conflicts on it; keep the fork's version, with upstream's other changes merged in.
-
-- **`git-relative-path`.** It refused any `realpath` whose `--version` doesn't say "GNU", which also rejects uutils coreutils, the default on Ubuntu 26.04. On a stock Ubuntu 26.04, every `git modified` that lists a file failed with "I expected the 'realpath' utility to be the GNU version". The fork carries "Accept any `realpath` with `--relative-to` in `git-relative-path`" from the `upstream-fix/git-relative-path-capability` branch (based on `354262e`), which checks for `--relative-to` instead. That still rejects BSD's `realpath`, which is what the GNU check was for (upstream #56). CI runs on `ubuntu-26.04`, so `scripts/test-git-modified.sh` exercises it there.
-
-  Drop it the same way, at the first sync after upstream has the fix.
+Both guards also skip names containing a literal SOH byte, which is used to preserve record boundaries in POSIX `sh`. Upstream's fixes for quoted filenames and uutils `realpath` are retained. The fork's old `scripts/test-git-modified.sh` remains retired; the regression tests now run in upstream's sandboxed bats suite.
 
 ## Versioning and releases
 

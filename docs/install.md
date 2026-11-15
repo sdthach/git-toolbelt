@@ -79,11 +79,26 @@ If you're working *inside a clone of this repo* rather than installing it, the c
 $ mise trust        # once, after cloning
 $ mise install      # shellcheck, yamllint
 $ mise run setup    # once: upstream remote (fetch-only) + gh default repo
-$ mise run ci       # everything CI runs: lint + smoke test
+$ mise run ci       # fork checks: lint + packaging smoke test
 ```
 
 `mise run setup` configures things that live in `.git/config` and therefore can't
 travel with a clone — see [maintaining-the-fork](maintaining-the-fork.md#remotes).
+
+### Upstream's test suite
+
+Upstream's own scripts have a [bats](https://github.com/bats-core/bats-core) suite in `test/`, run with `make test` (`test/run`). It runs in a sandbox that only allows writes inside a throwaway directory and blocks the network: `sandbox-exec` on macOS, bubblewrap (`bwrap`) on Linux. It refuses to run if the sandbox doesn't work.
+
+```console
+$ brew install bash bats-core coreutils # macOS
+$ PATH="$(brew --prefix bash)/bin:$PATH" make test
+$ sudo apt install bats bubblewrap      # Linux (or: mise use -g bats)
+$ make test
+```
+
+On macOS, select Homebrew Bash for Bats as shown above. System Bash ignores `TMPDIR` for here-document temporary files, so those writes are blocked by the sandbox. CI selects Homebrew Bash in the same way.
+
+On Ubuntu, AppArmor blocks the unprivileged user namespaces bwrap needs (`kernel.apparmor_restrict_unprivileged_userns=1`), so `make test` reports that it can't set up the sandbox. CI turns that off on its throwaway runners (`.github/workflows/test.yml`), and the suite runs there on Linux and macOS for every PR.
 
 The upstream `Makefile` (`make link` / `make unlink`) also works in a clone, but it only symlinks the root `git-*` scripts into `~/.local/bin` or `~/bin`. It does not link `portmanteaus/` or `bare-worktree/`, so use the mise environment above (or a package install) to get all of them.
 
