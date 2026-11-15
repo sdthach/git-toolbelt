@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.2](https://github.com/sdthach/git-toolbelt/compare/v2.1.1...v2.1.2) (2026-11-15)
+
+
+### Bug Fixes
+
+* sync upstream nvie/git-toolbelt to a484804 (10 commits) ([#28](https://github.com/sdthach/git-toolbelt/issues/28)) ([58d37da](https://github.com/sdthach/git-toolbelt/commit/58d37da40391b3dcae6112d05b272d327adfac87))
+
 ## [2.1.1](https://github.com/sdthach/git-toolbelt/compare/v2.1.0...v2.1.1) (2026-11-12)
 
 
